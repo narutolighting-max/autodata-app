@@ -328,7 +328,7 @@
                 <div class="action-row">
                     <button class="process-btn" id="processBtn" disabled>▶ Procesar Facturas</button>
                     <button class="clear-btn" id="clearBtn">Limpiar</button>
-                    <button class="download-btn" id="downloadBtn">📥 Descargar Excel</button>
+                    <button class="download-btn" id="downloadBtn">📥 Descargar Repositorio Excel</button>
                 </div>
 
                 <!-- STATUS -->
@@ -512,21 +512,25 @@ document.getElementById('processBtn').addEventListener('click', async function()
 
         if (response.ok && !result.error) {
             statusMsg.innerHTML = `
-                <strong>✅ Procesamiento completado</strong><br>
-                Facturas procesadas: ${result.new_invoices || 0}<br>
-                Duplicadas: ${result.skipped || 0}<br>
+                <strong>✅ Tus facturas ya están cargadas en el repositorio</strong><br>
+                Facturas nuevas: ${result.new_invoices || 0}<br>
+                Duplicadas (ya existían): ${result.skipped || 0}<br>
                 Otros documentos: ${result.other_docs || 0}<br>
-                Total archivos: ${selectedFiles.length}
+                ${result.new_invoices > 0 ? '📥 Descargando Excel automáticamente...' : ''}
             `;
             statusMsg.className = 'status-message success';
 
-            // Show download button
-            if (result.excel_download) {
+            // Auto-download Excel after processing
+            if (result.excel_download && result.new_invoices > 0) {
                 const dlBtn = document.getElementById('downloadBtn');
                 dlBtn.classList.add('active');
                 dlBtn.onclick = function() {
                     window.location.href = result.excel_download;
                 };
+                // Descarga automática
+                setTimeout(() => {
+                    window.location.href = result.excel_download;
+                }, 800);
             }
 
             // Update table
