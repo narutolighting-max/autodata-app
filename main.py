@@ -770,8 +770,6 @@ def create_or_load_excel(excel_path):
         cell = ws.cell(row=1, column=col_idx)
         cell.value = header
         cell.fill = PatternFill(start_color="00D4AA", end_color="00D4AA", fill_type="solid")
-        cell.font = cell.font.copy()
-        cell.font = cell.font.copy()
 
     return wb
 
