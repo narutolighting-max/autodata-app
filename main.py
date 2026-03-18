@@ -27,7 +27,7 @@ except ImportError:
 
 try:
     from openpyxl import Workbook, load_workbook
-    from openpyxl.styles import PatternFill
+    from openpyxl.styles import PatternFill, Font, Alignment
     EXCEL_SUPPORT = True
 except ImportError:
     EXCEL_SUPPORT = False
@@ -680,114 +680,244 @@ def server_error(e):
 # PROCESAR FACTURAS PDF (upload desde navegador)
 # ═══════════════════════════════════════════════
 
-# Carpeta persistente para el repositorio Excel
 REPO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 EXCEL_FILE = os.path.join(REPO_DIR, "repositorio_facturas.xlsx")
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
-
-# Crear carpetas si no existen
 os.makedirs(REPO_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# 21 columnas del repositorio (A-U)
 EXCEL_HEADERS = [
-    'Tipo Comp.', 'Nro. Comp.', 'Fecha Emision',
-    'CUIT Emisor', 'Razon Social Emisor',
-    'CUIT Cliente', 'Razon Social Cliente',
-    'Producto/Servicio', 'Importe Total ($)',
-    'CAE', 'Vto. CAE', 'Archivo PDF', 'Fecha Carga'
+    'Tipo Comp.', 'Punto Vta.', 'Nro. Comp.', 'Fecha Emisión',
+    'CUIT Emisor', 'Razón Social Emisor', 'Domicilio Emisor', 'Cond. IVA Emisor',
+    'CUIT Cliente', 'Razón Social Cliente', 'Domicilio Cliente', 'Cond. IVA Cliente',
+    'Cond. Venta', 'Per. Desde', 'Per. Hasta', 'Vto. Pago',
+    'Producto / Servicio', 'Importe Total ($)', 'CAE N°', 'Vto. CAE', 'Archivo PDF'
 ]
+
+# Grupos de headers (fila 3 con merge)
+HEADER_GROUPS = [
+    ('A3', 'C3', 'COMPROBANTE'),
+    ('D3', 'H3', 'EMISOR'),
+    ('I3', 'M3', 'CLIENTE'),
+    ('N3', 'P3', 'PERÍODO / VTO.'),
+    ('Q3', 'Q3', 'DETALLE'),
+    ('R3', 'S3', 'IMPORTES / CAE'),
+    ('T3', 'U3', 'ARCHIVO'),
+]
+
+COL_WIDTHS = {
+    'A': 12, 'B': 10, 'C': 14, 'D': 14, 'E': 18, 'F': 28,
+    'G': 36, 'H': 18, 'I': 18, 'J': 32, 'K': 40, 'L': 20,
+    'M': 12, 'N': 12, 'O': 12, 'P': 12, 'Q': 24, 'R': 18,
+    'S': 20, 'T': 12, 'U': 44
+}
+
+YELLOW_FILL = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+DARK_BLUE = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+MED_BLUE = PatternFill(start_color="2E75B6", end_color="2E75B6", fill_type="solid")
+WHITE_BOLD_13 = Font(name="Arial", size=13, bold=True, color="FFFFFF")
+WHITE_BOLD_9 = Font(name="Arial", size=9, bold=True, color="FFFFFF")
+DATA_FONT = Font(name="Arial", size=9)
+CENTER = Alignment(horizontal="center", vertical="center")
+LEFT = Alignment(horizontal="left", vertical="center")
 
 
 def get_or_create_excel():
-    """Carga el Excel existente o crea uno nuevo. NUNCA recrea si ya existe."""
     if not EXCEL_SUPPORT:
         return None
-
     if os.path.exists(EXCEL_FILE):
         try:
-            wb = load_workbook(EXCEL_FILE)
-            return wb
+            return load_workbook(EXCEL_FILE)
         except Exception as e:
-            print(f"Error cargando Excel existente: {e}")
+            print(f"Error cargando Excel: {e}")
 
-    # Solo crea si NO existe
     wb = Workbook()
     ws = wb.active
     ws.title = "Repositorio Facturas"
+
+    # Row 1: Title (merged A1:U1)
+    ws.merge_cells('A1:U1')
+    title_cell = ws['A1']
+    title_cell.value = "REPOSITORIO DE FACTURAS"
+    title_cell.font = WHITE_BOLD_13
+    title_cell.fill = DARK_BLUE
+    title_cell.alignment = CENTER
+
+    # Row 3: Group headers (merged)
+    for start, end, label in HEADER_GROUPS:
+        if start != end:
+            ws.merge_cells(f'{start}:{end}')
+        cell = ws[start]
+        cell.value = label
+        cell.font = WHITE_BOLD_9
+        cell.fill = DARK_BLUE
+        cell.alignment = CENTER
+
+    # Row 4: Sub-headers
     for col_idx, header in enumerate(EXCEL_HEADERS, 1):
-        cell = ws.cell(row=1, column=col_idx)
+        cell = ws.cell(row=4, column=col_idx)
         cell.value = header
-        cell.fill = PatternFill(start_color="00D4AA", end_color="00D4AA", fill_type="solid")
+        cell.font = WHITE_BOLD_9
+        cell.fill = MED_BLUE
+        cell.alignment = CENTER
+
+    # Column widths
+    for col_letter, width in COL_WIDTHS.items():
+        ws.column_dimensions[col_letter].width = width
+
+    # Freeze panes below headers
+    ws.freeze_panes = 'A5'
+
+    # Create "Otros Documentos" sheet
+    ws2 = wb.create_sheet("Otros Documentos")
+    ws2.merge_cells('A1:E1')
+    ws2['A1'].value = "DOCUMENTOS NO RELACIONADOS A FACTURACIÓN"
+    ws2['A1'].font = WHITE_BOLD_13
+    ws2['A1'].fill = DARK_BLUE
+    ws2['A1'].alignment = CENTER
+    ws2.merge_cells('A2:E2')
+    ws2['A2'].value = "Archivos encontrados que NO son comprobantes de venta"
+    ws2['A2'].font = Font(name="Arial", size=9, italic=True, color="666666")
+
+    otros_headers = ['Nombre del Archivo', 'Tipo', 'Observación', 'Fecha Detección', 'Acción Sugerida']
+    for col_idx, h in enumerate(otros_headers, 1):
+        cell = ws2.cell(row=4, column=col_idx)
+        cell.value = h
+        cell.font = WHITE_BOLD_9
+        cell.fill = MED_BLUE
+        cell.alignment = CENTER
+    ws2.column_dimensions['A'].width = 42
+    ws2.column_dimensions['B'].width = 10
+    ws2.column_dimensions['C'].width = 60
+    ws2.column_dimensions['D'].width = 16
+    ws2.column_dimensions['E'].width = 36
+    ws2.freeze_panes = 'A5'
+
+    # Create "Resumen" sheet
+    ws3 = wb.create_sheet("Resumen")
+    ws3['A1'].value = "RESUMEN EJECUTIVO"
+    ws3['A1'].font = WHITE_BOLD_13
+    ws3['A1'].fill = DARK_BLUE
+    ws3.merge_cells('A1:B1')
+    ws3['A1'].alignment = CENTER
+    ws3['A2'].value = "Concepto"
+    ws3['A2'].font = WHITE_BOLD_9
+    ws3['A2'].fill = MED_BLUE
+    ws3['B2'].value = "Valor"
+    ws3['B2'].font = WHITE_BOLD_9
+    ws3['B2'].fill = MED_BLUE
+    ws3['A3'].value = "Cantidad de Facturas"
+    ws3['B3'] = "=COUNTA('Repositorio Facturas'!C5:C9999)"
+    ws3['A4'].value = "Importe total facturado ($)"
+    ws3['B4'] = "=SUM('Repositorio Facturas'!R5:R9999)"
+    ws3.column_dimensions['A'].width = 30
+    ws3.column_dimensions['B'].width = 24
+
     wb.save(EXCEL_FILE)
     return wb
 
 
 def get_existing_invoices(ws):
-    """Lee los numeros de comprobante ya cargados para evitar duplicados."""
     existing = set()
     if ws:
-        for row in ws.iter_rows(min_row=2, values_only=True):
-            # Columna B = Nro. Comp. (indice 1)
-            if row and len(row) > 1 and row[1]:
-                existing.add(str(row[1]).strip())
+        for row in ws.iter_rows(min_row=5, values_only=True):
+            if row and len(row) > 2 and row[2]:
+                existing.add(str(row[2]).strip())
+    return existing
+
+
+def get_existing_otros(ws):
+    existing = set()
+    if ws:
+        for row in ws.iter_rows(min_row=5, values_only=True):
+            if row and row[0]:
+                existing.add(str(row[0]).strip())
     return existing
 
 
 def extract_invoice_data(pdf_path):
-    """Extrae datos de una factura PDF usando pdfplumber."""
     if not PDF_SUPPORT:
         return None
-
     try:
         data = {}
         with pdfplumber.open(pdf_path) as pdf:
             if len(pdf.pages) == 0:
                 return None
-
             text = pdf.pages[0].extract_text()
             if not text:
                 return None
 
-            # CUIT (XX-XXXXXXXX-X)
+            # Tipo comprobante (Factura A/B/C, Nota de Credito, Recibo)
+            tipo_match = re.search(r'(FACTURA|Factura|RECIBO|NOTA DE CR[ÉE]DITO|NOTA DE D[ÉE]BITO)\s*([ABC])?', text, re.IGNORECASE)
+            if tipo_match:
+                tipo_name = tipo_match.group(1).strip().title()
+                tipo_letra = tipo_match.group(2).upper() if tipo_match.group(2) else ""
+                data['tipo'] = f"{tipo_name} {tipo_letra}".strip()
+            else:
+                data['tipo'] = ""
+
+            # Punto de venta y Nro comprobante (separados)
+            pv_match = re.search(r'Punto de Venta:\s*(\d+)\s*Comp\.?\s*Nro:?\s*(\d+)', text, re.IGNORECASE)
+            if pv_match:
+                data['punto_vta'] = pv_match.group(1).zfill(5)
+                data['nro_comp'] = pv_match.group(2).zfill(8)
+            else:
+                nro_match = re.search(r'(?:Comp\.?\s*Nro|N[°º]|Nro\.?|N[úu]mero)[\s.:]*(\d[\d-]*\d)', text, re.IGNORECASE)
+                data['nro_comp'] = nro_match.group(1).strip() if nro_match else ""
+                data['punto_vta'] = ""
+
+            # Fecha emision
+            fecha_em = re.search(r'(?:Fecha\s*de\s*Emisi[óo]n|Fecha\s*Emisi[óo]n)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
+            if not fecha_em:
+                fecha_em = re.search(r'Fecha[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
+            data['fecha'] = fecha_em.group(1) if fecha_em else ""
+
+            # CUITs (XX-XXXXXXXX-X)
             cuit_all = re.findall(r'(\d{2}-\d{8}-\d)', text)
             data['cuit_emisor'] = cuit_all[0] if len(cuit_all) > 0 else ""
             data['cuit_cliente'] = cuit_all[1] if len(cuit_all) > 1 else ""
 
-            # Numero de comprobante
-            nro_match = re.search(r'(?:Comp\.?\s*Nro|N\xb0|Nro\.?|N\u00famero)[\s.:]*(\d[\d-]*\d)', text, re.IGNORECASE)
-            data['nro_comp'] = nro_match.group(1).strip() if nro_match else ""
-
-            # Punto de venta + nro comprobante combinado
-            pv_match = re.search(r'Punto de Venta:\s*(\d+)\s*Comp\.\s*Nro:\s*(\d+)', text, re.IGNORECASE)
-            if pv_match and not data['nro_comp']:
-                data['nro_comp'] = f"{pv_match.group(1).zfill(4)}-{pv_match.group(2).zfill(8)}"
-            elif pv_match:
-                data['nro_comp'] = f"{pv_match.group(1).zfill(4)}-{pv_match.group(2).zfill(8)}"
-
-            # Fecha emision
-            fecha_em = re.search(r'(?:Fecha de Emisi\u00f3n|Fecha Emisi\u00f3n|Fecha)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
-            data['fecha'] = fecha_em.group(1) if fecha_em else ""
-
-            # Razon social emisor (primera linea despues de CUIT generalmente)
-            razon_em = re.search(r'(?:Raz\u00f3n Social|Apellido y Nombre)[:\s]*([^\n]+)', text, re.IGNORECASE)
-            data['razon_social_emisor'] = razon_em.group(1).strip()[:80] if razon_em else ""
-
-            # Razon social cliente
-            # Buscar segundo bloque de Razon Social
-            razones = re.findall(r'(?:Raz\u00f3n Social|Apellido y Nombre)[:\s]*([^\n]+)', text, re.IGNORECASE)
+            # Razones sociales
+            razones = re.findall(r'(?:Raz[óo]n Social|Apellido y Nombre|Denominaci[óo]n)[:\s]*([^\n]+)', text, re.IGNORECASE)
+            data['razon_social_emisor'] = razones[0].strip()[:80] if len(razones) > 0 else ""
             data['razon_social_cliente'] = razones[1].strip()[:80] if len(razones) > 1 else ""
 
+            # Domicilios
+            domicilios = re.findall(r'(?:Domicilio\s*(?:Comercial)?|Direcci[óo]n)[:\s]*([^\n]+)', text, re.IGNORECASE)
+            data['domicilio_emisor'] = domicilios[0].strip()[:100] if len(domicilios) > 0 else ""
+            data['domicilio_cliente'] = domicilios[1].strip()[:100] if len(domicilios) > 1 else ""
+
+            # Condicion IVA
+            iva_all = re.findall(r'(?:Condici[óo]n\s*(?:frente al\s*)?IVA|Cond\.?\s*IVA)[:\s]*([^\n]+)', text, re.IGNORECASE)
+            data['cond_iva_emisor'] = iva_all[0].strip()[:40] if len(iva_all) > 0 else ""
+            data['cond_iva_cliente'] = iva_all[1].strip()[:40] if len(iva_all) > 1 else ""
+
+            # Condicion de venta
+            cond_vta = re.search(r'(?:Condici[óo]n\s*de\s*Venta|Cond\.?\s*Venta)[:\s]*([^\n]+)', text, re.IGNORECASE)
+            data['cond_venta'] = cond_vta.group(1).strip()[:30] if cond_vta else ""
+
+            # Periodos
+            per_desde = re.search(r'(?:Per[íi]odo\s*(?:Facturado\s*)?Desde|Desde)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
+            per_hasta = re.search(r'(?:Per[íi]odo\s*(?:Facturado\s*)?Hasta|Hasta)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
+            data['per_desde'] = per_desde.group(1) if per_desde else ""
+            data['per_hasta'] = per_hasta.group(1) if per_hasta else ""
+
+            # Vto pago
+            vto_pago = re.search(r'(?:Vto\.?\s*(?:de\s*)?Pago|Vencimiento\s*(?:del\s*)?Pago|Fecha\s*Vto\.?\s*Pago)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
+            data['vto_pago'] = vto_pago.group(1) if vto_pago else ""
+
             # Producto/Servicio
-            prod_match = re.search(r'(?:Descripci\u00f3n|Concepto|Servicio|Producto)[:\s]*([^\n]+)', text, re.IGNORECASE)
+            prod_match = re.search(r'(?:Descripci[óo]n|Concepto|Servicio|Producto)[:\s]*([^\n]+)', text, re.IGNORECASE)
             data['producto'] = prod_match.group(1).strip()[:100] if prod_match else ""
 
             # Importe total
-            imp_match = re.search(r'(?:Importe Total|Total)[:\s$]*\$?\s*([\d.,]+)', text, re.IGNORECASE)
+            imp_match = re.search(r'(?:Importe\s*Total|Total)[:\s$]*\$?\s*([\d.,]+)', text, re.IGNORECASE)
             if imp_match:
                 monto_str = imp_match.group(1).replace('.', '').replace(',', '.')
                 try:
                     data['importe'] = float(monto_str)
-                except:
+                except Exception:
                     data['importe'] = 0.0
             else:
                 data['importe'] = 0.0
@@ -797,12 +927,8 @@ def extract_invoice_data(pdf_path):
             data['cae'] = cae_match.group(1) if cae_match else ""
 
             # Vto CAE
-            vto_cae = re.search(r'(?:Vto\.?\s*CAE|Fecha Vto\.?\s*CAE)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
+            vto_cae = re.search(r'(?:Vto\.?\s*(?:de\s*)?CAE|Fecha\s*Vto\.?\s*CAE)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
             data['vto_cae'] = vto_cae.group(1) if vto_cae else ""
-
-            # Tipo comprobante
-            tipo_match = re.search(r'(?:FACTURA|Factura|RECIBO|NOTA DE CR\u00c9DITO|NOTA DE D\u00c9BITO)\s*([ABC])?', text, re.IGNORECASE)
-            data['tipo'] = tipo_match.group(1).upper() if tipo_match and tipo_match.group(1) else "C"
 
             return data
 
@@ -811,19 +937,69 @@ def extract_invoice_data(pdf_path):
         return None
 
 
+def add_invoice_row(ws, row_num, data, filename):
+    """Agrega una fila de factura. Pinta en amarillo los campos vacios."""
+    fields = [
+        ('tipo', 1), ('punto_vta', 2), ('nro_comp', 3), ('fecha', 4),
+        ('cuit_emisor', 5), ('razon_social_emisor', 6), ('domicilio_emisor', 7),
+        ('cond_iva_emisor', 8), ('cuit_cliente', 9), ('razon_social_cliente', 10),
+        ('domicilio_cliente', 11), ('cond_iva_cliente', 12), ('cond_venta', 13),
+        ('per_desde', 14), ('per_hasta', 15), ('vto_pago', 16),
+        ('producto', 17), ('importe', 18), ('cae', 19), ('vto_cae', 20)
+    ]
+    missing = []
+    for key, col in fields:
+        cell = ws.cell(row=row_num, column=col)
+        val = data.get(key, "")
+        cell.value = val
+        cell.font = DATA_FONT
+        cell.alignment = LEFT if col > 4 else CENTER
+        if not val and val != 0:
+            cell.fill = YELLOW_FILL
+            missing.append(EXCEL_HEADERS[col - 1])
+
+    # Col U = Archivo PDF
+    cell_u = ws.cell(row=row_num, column=21)
+    cell_u.value = filename
+    cell_u.font = DATA_FONT
+    cell_u.alignment = LEFT
+    return missing
+
+
+def add_otros_doc(wb, filename, observacion):
+    """Agrega un doc no-factura a la hoja Otros Documentos."""
+    if "Otros Documentos" not in wb.sheetnames:
+        return
+    ws2 = wb["Otros Documentos"]
+    # Check duplicates
+    existing = get_existing_otros(ws2)
+    if filename in existing:
+        return
+    row_num = ws2.max_row + 1
+    if row_num < 5:
+        row_num = 5
+    ext = os.path.splitext(filename)[1].upper().replace('.', '') or 'Desconocido'
+    ws2.cell(row=row_num, column=1).value = filename
+    ws2.cell(row=row_num, column=1).font = DATA_FONT
+    ws2.cell(row=row_num, column=2).value = ext
+    ws2.cell(row=row_num, column=2).font = DATA_FONT
+    ws2.cell(row=row_num, column=3).value = observacion
+    ws2.cell(row=row_num, column=3).font = DATA_FONT
+    ws2.cell(row=row_num, column=4).value = datetime.now().strftime("%d/%m/%Y")
+    ws2.cell(row=row_num, column=4).font = DATA_FONT
+    ws2.cell(row=row_num, column=5).value = "Mover a otra carpeta"
+    ws2.cell(row=row_num, column=5).font = DATA_FONT
+
+
 @app.route("/ad-api/invoices/upload-process", methods=["POST"])
 def upload_and_process():
-    """Recibe PDFs subidos desde el navegador, los procesa y agrega al Excel persistente."""
     try:
         files = request.files.getlist("pdfs")
         if not files or len(files) == 0:
             return jsonify({"error": True, "mensaje": "No se recibieron archivos PDF"}), 400
 
-        # Cargar o crear el repositorio Excel (persistente)
         wb = get_or_create_excel()
         ws = wb.active if wb else None
-
-        # Leer facturas ya cargadas
         existing = get_existing_invoices(ws) if ws else set()
 
         documents = []
@@ -836,18 +1012,17 @@ def upload_and_process():
 
             if not filename.lower().endswith('.pdf'):
                 documents.append({"nombre": filename, "estado": "no_pdf", "detalle": "No es PDF"})
+                add_otros_doc(wb, filename, "No es un archivo PDF")
                 other_count += 1
                 continue
 
-            # Guardar temporalmente
             tmp_path = os.path.join(UPLOAD_DIR, filename)
             f.save(tmp_path)
 
             try:
-                # Intentar extraer datos
                 invoice_data = extract_invoice_data(tmp_path)
 
-                if invoice_data and invoice_data.get('nro_comp'):
+                if invoice_data and invoice_data.get('nro_comp') and invoice_data.get('cae'):
                     nro = invoice_data['nro_comp']
 
                     if nro in existing:
@@ -858,32 +1033,25 @@ def upload_and_process():
                         })
                         skip_count += 1
                     else:
-                        # Agregar al Excel
                         if ws:
                             row_num = ws.max_row + 1
-                            ws.cell(row=row_num, column=1).value = invoice_data.get('tipo', 'C')
-                            ws.cell(row=row_num, column=2).value = nro
-                            ws.cell(row=row_num, column=3).value = invoice_data.get('fecha', '')
-                            ws.cell(row=row_num, column=4).value = invoice_data.get('cuit_emisor', '')
-                            ws.cell(row=row_num, column=5).value = invoice_data.get('razon_social_emisor', '')
-                            ws.cell(row=row_num, column=6).value = invoice_data.get('cuit_cliente', '')
-                            ws.cell(row=row_num, column=7).value = invoice_data.get('razon_social_cliente', '')
-                            ws.cell(row=row_num, column=8).value = invoice_data.get('producto', '')
-                            ws.cell(row=row_num, column=9).value = invoice_data.get('importe', 0)
-                            ws.cell(row=row_num, column=10).value = invoice_data.get('cae', '')
-                            ws.cell(row=row_num, column=11).value = invoice_data.get('vto_cae', '')
-                            ws.cell(row=row_num, column=12).value = filename
-                            ws.cell(row=row_num, column=13).value = datetime.now().strftime("%Y-%m-%d %H:%M")
+                            if row_num < 5:
+                                row_num = 5
+                            missing = add_invoice_row(ws, row_num, invoice_data, filename)
 
                         existing.add(nro)
                         new_count += 1
+                        detail = f"Comp. {nro} - ${invoice_data.get('importe', 0):,.2f}"
+                        if missing:
+                            detail += f" (campos faltantes: {', '.join(missing[:3])})"
                         documents.append({
                             "nombre": filename,
                             "estado": "procesado",
-                            "detalle": f"Comp. {nro} - ${invoice_data.get('importe', 0):,.2f}"
+                            "detalle": detail
                         })
                 else:
-                    # No se pudo extraer o no es factura AFIP
+                    obs = "No es un comprobante de facturación (AFIP). No tiene CAE ni datos de emisor/cliente CUIT."
+                    add_otros_doc(wb, filename, obs)
                     documents.append({
                         "nombre": filename,
                         "estado": "no_factura",
@@ -898,15 +1066,12 @@ def upload_and_process():
                     "detalle": str(e)[:60]
                 })
                 other_count += 1
-
             finally:
-                # Limpiar archivo temporal
                 try:
                     os.remove(tmp_path)
-                except:
+                except Exception:
                     pass
 
-        # Guardar Excel (acumula datos, nunca borra)
         if wb:
             wb.save(EXCEL_FILE)
 
@@ -917,7 +1082,7 @@ def upload_and_process():
             "other_docs": other_count,
             "documents": documents,
             "excel_download": "/ad-api/invoices/download-excel",
-            "mensaje": f"✅ {new_count} facturas nuevas cargadas. {skip_count} duplicadas. {other_count} otros."
+            "mensaje": f"{new_count} facturas nuevas cargadas. {skip_count} duplicadas. {other_count} otros."
         }), 200
 
     except Exception as e:
@@ -929,30 +1094,25 @@ def upload_and_process():
 
 @app.route("/ad-api/invoices/download-excel")
 def download_excel():
-    """Descarga el repositorio Excel persistente."""
     if os.path.exists(EXCEL_FILE):
         return send_from_directory(
-            REPO_DIR,
-            "repositorio_facturas.xlsx",
-            as_attachment=True,
-            download_name="repositorio_facturas.xlsx"
+            REPO_DIR, "repositorio_facturas.xlsx",
+            as_attachment=True, download_name="repositorio_facturas.xlsx"
         )
     return jsonify({"error": True, "mensaje": "El repositorio aún no fue creado"}), 404
 
 
 @app.route("/ad-api/invoices/stats")
 def invoice_stats():
-    """Devuelve estadísticas del repositorio actual."""
     if not os.path.exists(EXCEL_FILE) or not EXCEL_SUPPORT:
         return jsonify({"total": 0, "exists": False})
-
     try:
         wb = load_workbook(EXCEL_FILE, read_only=True)
         ws = wb.active
-        total = ws.max_row - 1 if ws.max_row > 1 else 0
+        total = ws.max_row - 4 if ws.max_row > 4 else 0
         wb.close()
         return jsonify({"total": total, "exists": True})
-    except:
+    except Exception:
         return jsonify({"total": 0, "exists": True})
 
 
