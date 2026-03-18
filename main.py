@@ -1,7 +1,7 @@
 """
-AutoData Technologies â Servidor de ProducciÃ³n v2.4.1
+AutoData Technologies — Servidor de Producción v2.4.1
 Backend Flask con API REST + Frontend integrado
-Â© 2025 AutoData Technologies â autodata.com
+© 2025 AutoData Technologies — autodata.com
 """
 
 import os
@@ -15,9 +15,9 @@ from functools import wraps
 from flask import Flask, jsonify, request, send_from_directory, make_response
 from flask_cors import CORS
 
-# âââââââââââââââââââââââââââââââââââââââââââââââ
-# CONFIGURACIÃN
-# âââââââââââââââââââââââââââââââââââââââââââââââ
+# ═══════════════════════════════════════════════
+# CONFIGURACIÓN
+# ═══════════════════════════════════════════════
 VERSION = "2.4.1"
 SECRET_KEY = os.environ.get("AUTODATA_SECRET", secrets.token_hex(32))
 DB_PATH = os.environ.get("DATABASE_URL", "autodata_demo.db")
@@ -28,9 +28,9 @@ app.config["SECRET_KEY"] = SECRET_KEY
 CORS(app, resources={r"/ad-api/*": {"origins": "*"}})
 
 
-# âââââââââââââââââââââââââââââââââââââââââââââââ
-# BASE DE DATOS SQLITE â DEMO
-# âââââââââââââââââââââââââââââââââââââââââââââââ
+# ═══════════════════════════════════════════════
+# BASE DE DATOS SQLITE — DEMO
+# ═══════════════════════════════════════════════
 
 def get_db():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -87,7 +87,7 @@ def init_db():
         creado TEXT DEFAULT CURRENT_TIMESTAMP
     )""")
 
-    # Tabla desvÃ­os
+    # Tabla desvíos
     c.execute("""CREATE TABLE IF NOT EXISTS desvios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         archivo TEXT,
@@ -115,7 +115,7 @@ def init_db():
         fuente TEXT
     )""")
 
-    # Tabla auditorÃ­a
+    # Tabla auditoría
     c.execute("""CREATE TABLE IF NOT EXISTS auditoria (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -129,7 +129,7 @@ def init_db():
 
     conn.commit()
 
-    # Insertar datos demo si la tabla estÃ¡ vacÃ­a
+    # Insertar datos demo si la tabla está vacía
     if c.execute("SELECT COUNT(*) FROM usuarios").fetchone()[0] == 0:
         _seed_demo_data(c)
         conn.commit()
@@ -149,7 +149,7 @@ def _seed_demo_data(c):
         ('demo@dataintelligence.com', ?, 'Guillermo', 'CLIENT_ADMIN', 'Dataintelligence.com')
     """, (_hash_password("AutoData2025"),))
 
-    # Facturas demo â Argentina AFIP
+    # Facturas demo — Argentina AFIP
     facturas = [
         ("0003-00000412","A","30-68123456-8","Cloud Services SRL","2025-01-18","2025-02-17",125000,26250,151250,"ARS","Servicios","Pagada","ALTO",98.5,"factura_cloud_412.pdf"),
         ("0002-00000067","A","30-72345678-1","Consultora BDG S.A.","2025-03-10","2025-04-09",320000,67200,387200,"ARS","Servicios","Pagada","ALTO",97.8,"factura_bdg_067.pdf"),
@@ -162,7 +162,7 @@ def _seed_demo_data(c):
         ("0008-00001234","A","30-69876543-2","Telecom Empresas","2025-02-20","2025-02-22",35000,7350,42350,"ARS","Servicios","Vencida","ALTO",97.2,"factura_telecom_1234.pdf"),
         ("0001-00000095","A","30-71234567-9","Technika S.A.","2025-03-01","2025-03-31",38000,7980,45980,"ARS","Servicios","Pendiente","ALTO",99.0,"factura_technika_095.pdf"),
         ("0001-00000123","A","30-71345678-0","Seguros Corporativos","2025-03-03","2025-04-02",95000,19950,114950,"ARS","Servicios","Pagada","ALTO",98.1,"factura_seguros_123.pdf"),
-        ("0003-00000890","B","30-55678901-3","PapelerÃ­a Central SA","2025-03-05","2025-04-04",4200,0,4200,"ARS","Materiales","Pagada","ALTO",99.5,"factura_papeleria_890.pdf"),
+        ("0003-00000890","B","30-55678901-3","Papelería Central SA","2025-03-05","2025-04-04",4200,0,4200,"ARS","Materiales","Pagada","ALTO",99.5,"factura_papeleria_890.pdf"),
         ("0003-00000445","A","30-68123456-8","Cloud Services SRL","2025-03-07","2025-04-06",125000,26250,151250,"ARS","Servicios","Pendiente","ALTO",98.8,"factura_cloud_445.pdf"),
         ("0002-00000078","A","30-72345678-1","Consultora BDG SA","2025-04-20","2025-05-20",340000,71400,411400,"ARS","Servicios","Pagada","ALTO",97.5,"factura_bdg_078.pdf"),
         ("0001-00000256","A","30-70123456-7","NetConnect SRL","2025-04-05","2025-05-05",22000,4620,26620,"ARS","Servicios","Pagada","ALTO",98.9,"factura_netconn_256.pdf"),
@@ -188,10 +188,10 @@ def _seed_demo_data(c):
          subtotal,iva_monto,total,moneda,categoria,estado,calidad,confianza,archivo)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", facturas)
 
-    # DesvÃ­os demo
+    # Desvíos demo
     desvios = [
         ("factura_technika_089_DESVIO.pdf","NUM-001","Totales inconsistentes","Total ARS","$45.200",78.0,"","Pendiente",None,None),
-        ("factura_recursos_plus_BORROSA.pdf","DOC-002","Imagen borrosa","NÂ° Factura","0001-0000?4",45.0,"","CrÃ­tico",None,None),
+        ("factura_recursos_plus_BORROSA.pdf","DOC-002","Imagen borrosa","N° Factura","0001-0000?4",45.0,"","Crítico",None,None),
         ("factura_nuevo_003.pdf","PRO-001","Proveedor desconocido","CUIT","30-80123456-5",85.0,"","Moderado",None,None),
     ]
     c.executemany("""INSERT INTO desvios
@@ -200,42 +200,42 @@ def _seed_demo_data(c):
 
     # Automatizaciones demo
     automatizaciones = [
-        ("SincronizaciÃ³n diaria de facturas","sync",1,"2025-06-10 08:00:00","2025-06-11 08:00:00","â 12 facturas procesadas","Google Drive â Carpeta Facturas 2025"),
-        ("DetecciÃ³n de desvÃ­os","quality",1,"2025-06-10 08:01:00","2025-06-11 08:01:00","â  1 desvÃ­o detectado","AutomÃ¡tico"),
-        ("ActualizaciÃ³n Excel AutoData","excel",1,"2025-06-10 08:05:00","2025-06-11 08:05:00","â Completado","AutomÃ¡tico"),
-        ("Reporte ejecutivo PDF semanal","report",1,"2025-06-09 07:00:00","2025-06-16 07:00:00","â Enviado","AutomÃ¡tico"),
-        ("Resumen semanal por email","email",1,"2025-06-09 07:01:00","2025-06-16 07:01:00","â 3 destinatarios","AutomÃ¡tico"),
-        ("Alertas facturas por vencer","alert_vencer",1,"2025-06-10 09:00:00","2025-06-11 09:00:00","â Sin alertas hoy","AutomÃ¡tico"),
-        ("Alertas facturas vencidas","alert_vencidas",1,"2025-06-10 09:00:00","2025-06-11 09:00:00","â  3 facturas vencidas","AutomÃ¡tico"),
-        ("Backup automÃ¡tico","backup",1,"2025-06-10 02:00:00","2025-06-11 02:00:00","â 2.3 MB guardados","AutomÃ¡tico"),
+        ("Sincronización diaria de facturas","sync",1,"2025-06-10 08:00:00","2025-06-11 08:00:00","✓ 12 facturas procesadas","Google Drive — Carpeta Facturas 2025"),
+        ("Detección de desvíos","quality",1,"2025-06-10 08:01:00","2025-06-11 08:01:00","⚠ 1 desvío detectado","Automático"),
+        ("Actualización Excel AutoData","excel",1,"2025-06-10 08:05:00","2025-06-11 08:05:00","✓ Completado","Automático"),
+        ("Reporte ejecutivo PDF semanal","report",1,"2025-06-09 07:00:00","2025-06-16 07:00:00","✓ Enviado","Automático"),
+        ("Resumen semanal por email","email",1,"2025-06-09 07:01:00","2025-06-16 07:01:00","✓ 3 destinatarios","Automático"),
+        ("Alertas facturas por vencer","alert_vencer",1,"2025-06-10 09:00:00","2025-06-11 09:00:00","✓ Sin alertas hoy","Automático"),
+        ("Alertas facturas vencidas","alert_vencidas",1,"2025-06-10 09:00:00","2025-06-11 09:00:00","⚠ 3 facturas vencidas","Automático"),
+        ("Backup automático","backup",1,"2025-06-10 02:00:00","2025-06-11 02:00:00","✓ 2.3 MB guardados","Automático"),
     ]
     c.executemany("""INSERT INTO automatizaciones
         (nombre,tipo,activa,ultima_ejecucion,proxima_ejecucion,ultimo_resultado,fuente)
         VALUES (?,?,?,?,?,?,?)""", automatizaciones)
 
-    # AuditorÃ­a demo
+    # Auditoría demo
     audits = [
-        ("2025-06-10 08:00:12","SINCRONIZACIÃN","Sistema","Drive sync iniciado",None,"â 12 facturas procesadas","servidor-01"),
-        ("2025-06-10 08:01:34","EXTRACCIÃN","Sistema","ExtracciÃ³n IA","factura_technika_089.pdf","â  DesvÃ­o detectado [NUM-001]","servidor-01"),
-        ("2025-06-10 09:14:22","CORRECCIÃN","guillermo@dataintelligence.com","CorrecciÃ³n manual","factura_technika_089.pdf","â Verificado","desktop-01"),
-        ("2025-06-09 08:00:10","SINCRONIZACIÃN","Sistema","Drive sync iniciado",None,"â 8 facturas procesadas","servidor-01"),
-        ("2025-06-09 09:30:45","LOGIN","guillermo@dataintelligence.com","Inicio de sesiÃ³n",None,"â Autenticado","desktop-01"),
-        ("2025-06-08 08:00:09","SINCRONIZACIÃN","Sistema","Drive sync iniciado",None,"â 15 facturas procesadas","servidor-01"),
-        ("2025-06-07 11:22:14","CORRECCIÃN","ana.garcia@dataintelligence.com","CorrecciÃ³n manual","factura_servicios_200.pdf","â Verificado","desktop-02"),
-        ("2025-06-05 14:03:21","EXPORTACIÃN","guillermo@dataintelligence.com","Reporte PDF exportado","Reporte_Mayo_2025.pdf","â Generado","desktop-01"),
-        ("2025-06-03 16:45:02","BACKUP","Sistema","Backup automÃ¡tico","store_dataintelligence.db","â 2.3 MB","servidor-01"),
-        ("2025-06-01 07:00:00","REPORTE EMAIL","Sistema","Resumen semanal enviado",None,"â 3 destinatarios","servidor-01"),
+        ("2025-06-10 08:00:12","SINCRONIZACIÓN","Sistema","Drive sync iniciado",None,"✓ 12 facturas procesadas","servidor-01"),
+        ("2025-06-10 08:01:34","EXTRACCIÓN","Sistema","Extracción IA","factura_technika_089.pdf","⚠ Desvío detectado [NUM-001]","servidor-01"),
+        ("2025-06-10 09:14:22","CORRECCIÓN","guillermo@dataintelligence.com","Corrección manual","factura_technika_089.pdf","✓ Verificado","desktop-01"),
+        ("2025-06-09 08:00:10","SINCRONIZACIÓN","Sistema","Drive sync iniciado",None,"✓ 8 facturas procesadas","servidor-01"),
+        ("2025-06-09 09:30:45","LOGIN","guillermo@dataintelligence.com","Inicio de sesión",None,"✓ Autenticado","desktop-01"),
+        ("2025-06-08 08:00:09","SINCRONIZACIÓN","Sistema","Drive sync iniciado",None,"✓ 15 facturas procesadas","servidor-01"),
+        ("2025-06-07 11:22:14","CORRECCIÓN","ana.garcia@dataintelligence.com","Corrección manual","factura_servicios_200.pdf","✓ Verificado","desktop-02"),
+        ("2025-06-05 14:03:21","EXPORTACIÓN","guillermo@dataintelligence.com","Reporte PDF exportado","Reporte_Mayo_2025.pdf","✓ Generado","desktop-01"),
+        ("2025-06-03 16:45:02","BACKUP","Sistema","Backup automático","store_dataintelligence.db","✓ 2.3 MB","servidor-01"),
+        ("2025-06-01 07:00:00","REPORTE EMAIL","Sistema","Resumen semanal enviado",None,"✓ 3 destinatarios","servidor-01"),
     ]
     c.executemany("""INSERT INTO auditoria
         (timestamp,tipo,usuario,operacion,archivo,resultado,equipo)
         VALUES (?,?,?,?,?,?,?)""", audits)
 
-    print("â Datos demo de Dataintelligence.com cargados correctamente.")
+    print("✓ Datos demo de Dataintelligence.com cargados correctamente.")
 
 
-# âââââââââââââââââââââââââââââââââââââââââââââââ
-# AUTENTICACIÃN â TOKEN SIMPLE
-# âââââââââââââââââââââââââââââââââââââââââââââââ
+# ═══════════════════════════════════════════════
+# AUTENTICACIÓN — TOKEN SIMPLE
+# ═══════════════════════════════════════════════
 
 def generar_token(usuario_id):
     token = secrets.token_urlsafe(32)
@@ -269,7 +269,7 @@ def requiere_auth(f):
         if not usuario:
             return jsonify({
                 "error": True, "codigo": "AD-AUTH-401",
-                "mensaje": "AutoData requiere autenticaciÃ³n vÃ¡lida.",
+                "mensaje": "AutoData requiere autenticación válida.",
                 "soporte": "soporte@autodata.com"
             }), 401
         request.usuario = usuario
@@ -277,9 +277,9 @@ def requiere_auth(f):
     return decorado
 
 
-# âââââââââââââââââââââââââââââââââââââââââââââââ
+# ═══════════════════════════════════════════════
 # HEADERS BRANDED
-# âââââââââââââââââââââââââââââââââââââââââââââââ
+# ═══════════════════════════════════════════════
 
 @app.after_request
 def branded_headers(response):
@@ -298,9 +298,9 @@ def handle_options():
         return "", 200
 
 
-# âââââââââââââââââââââââââââââââââââââââââââââââ
-# FRONTEND â Servir el portal HTML
-# âââââââââââââââââââââââââââââââââââââââââââââââ
+# ═══════════════════════════════════════════════
+# FRONTEND — Servir el portal HTML
+# ═══════════════════════════════════════════════
 
 @app.route("/")
 @app.route("/dashboard")
@@ -309,22 +309,22 @@ def handle_options():
 @app.route("/automatizaciones")
 @app.route("/configuracion")
 def frontend():
-    return send_from_directory("templates",""index.html")
+    return send_from_directory("templates", "index.html")
 
 
-# âââââââââââââââââââââââââââââââââââââââââââââââ
-# API REST â AUTENTICACIÃN
-# âââââââââââââââââââââââââââââââââââââââââââââââ
+# ═══════════════════════════════════════════════
+# API REST — AUTENTICACIÓN
+# ═══════════════════════════════════════════════
 
 @app.route("/ad-api/auth/login", methods=["POST"])
 def login():
     data = request.get_json() or {}
-    email = data.get("email",""").strip().lower()
+    email = data.get("email", "").strip().lower()
     password = data.get("password", "")
 
     if not email or not password:
         return jsonify({"error": True, "codigo": "AD-AUTH-400",
-                        "mensaje": "Email y contraseÃ±a son requeridos."}), 400
+                        "mensaje": "Email y contraseña son requeridos."}), 400
 
     conn = get_db()
     usuario = conn.execute(
@@ -333,9 +333,9 @@ def login():
     conn.close()
 
     if not usuario or usuario["password_hash"] != _hash_password(password):
-        time.sleep(0.5)  # Anti-brute-force mÃ­nimo
+        time.sleep(0.5)  # Anti-brute-force mínimo
         return jsonify({"error": True, "codigo": "AD-AUTH-401",
-                        "mensaje": "Credenciales incorrectas. VerificÃ¡ tu email y contraseÃ±a.",
+                        "mensaje": "Credenciales incorrectas. Verificá tu email y contraseña.",
                         "soporte": "soporte@autodata.com"}), 401
 
     token, expira = generar_token(usuario["id"])
@@ -345,7 +345,7 @@ def login():
     conn.execute("UPDATE usuarios SET ultimo_login=? WHERE id=?",
                  (datetime.utcnow().isoformat(), usuario["id"]))
     conn.execute("INSERT INTO auditoria (tipo,usuario,operacion,resultado,equipo) VALUES (?,?,?,?,?)",
-                 ("LOGIN", email, "Inicio de sesiÃ³n", "â Autenticado", request.remote_addr))
+                 ("LOGIN", email, "Inicio de sesión", "✓ Autenticado", request.remote_addr))
     conn.commit()
     conn.close()
 
@@ -372,12 +372,12 @@ def logout():
     conn.execute("UPDATE sesiones SET activa=0 WHERE token=?", (token,))
     conn.commit()
     conn.close()
-    return jsonify({"mensaje": "SesiÃ³n cerrada correctamente."})
+    return jsonify({"mensaje": "Sesión cerrada correctamente."})
 
 
-# âââââââââââââââââââââââââââââââââââââââââââââââ
-# API REST â STATUS
-# âââââââââââââââââââââââââââââââââââââââââââââââ
+# ═══════════════════════════════════════════════
+# API REST — STATUS
+# ═══════════════════════════════════════════════
 
 @app.route("/ad-api/status")
 def status():
@@ -397,9 +397,9 @@ def status():
     })
 
 
-# âââââââââââââââââââââââââââââââââââââââââââââââ
-# API REST â DASHBOARD KPIs
-# âââââââââââââââââââââââââââââââââââââââââââââââ
+# ═══════════════════════════════════════════════
+# API REST — DASHBOARD KPIs
+# ═══════════════════════════════════════════════
 
 @app.route("/ad-api/dashboard/kpis")
 @requiere_auth
@@ -415,7 +415,7 @@ def dashboard_kpis():
         "SELECT COUNT(*) FROM facturas WHERE estado='Vencida'"
     ).fetchone()[0]
     desvios_pendientes = conn.execute(
-        "SELECT COUNT(*) FROM desvios WHERE estado IN ('Pendiente','CrÃ­tico','Moderado')"
+        "SELECT COUNT(*) FROM desvios WHERE estado IN ('Pendiente','Crítico','Moderado')"
     ).fetchone()[0]
 
     conn.close()
@@ -457,16 +457,16 @@ def dashboard_charts():
             {"nombre": "Technika S.A.", "monto": 386720, "facturas": 14},
         ],
         "insights": [
-            "ð Los proveedores de servicios aumentaron un 18% vs. mes anterior.",
-            "â  3 facturas de Technika S.A. y Telecom Empresas vencidas sin pago â $88.580 ARS.",
-            "â Tasa de desvÃ­os: 3.2% â mejor registro histÃ³rico. Promedio del sector: 8.4%."
+            "📈 Los proveedores de servicios aumentaron un 18% vs. mes anterior.",
+            "⚠ 3 facturas de Technika S.A. y Telecom Empresas vencidas sin pago — $88.580 ARS.",
+            "✓ Tasa de desvíos: 3.2% — mejor registro histórico. Promedio del sector: 8.4%."
         ]
     })
 
 
-# âââââââââââââââââââââââââââââââââââââââââââââââ
-# API REST â FACTURAS
-# âââââââââââââââââââââââââââââââââââââââââââââââ
+# ═══════════════════════════════════════════════
+# API REST — FACTURAS
+# ═══════════════════════════════════════════════
 
 @app.route("/ad-api/invoices")
 @requiere_auth
@@ -509,13 +509,13 @@ def get_factura(invoice_id):
     conn.close()
     if not row:
         return jsonify({"error": True, "codigo": "AD-4004",
-                        "mensaje": "AutoData no encontrÃ³ esta factura."}), 404
+                        "mensaje": "AutoData no encontró esta factura."}), 404
     return jsonify(dict(row))
 
 
-# âââââââââââââââââââââââââââââââââââââââââââââââ
-# API REST â DESVÃOS
-# âââââââââââââââââââââââââââââââââââââââââââââââ
+# ═══════════════════════════════════════════════
+# API REST — DESVÍOS
+# ═══════════════════════════════════════════════
 
 @app.route("/ad-api/deviations")
 @requiere_auth
@@ -528,7 +528,7 @@ def get_desvios():
     return jsonify({
         "desvios": [dict(r) for r in rows],
         "total": len(rows),
-        "pendientes": sum(1 for r in rows if dict(r)["estado"] in ("Pendiente","CrÃ­tico","Moderado"))
+        "pendientes": sum(1 for r in rows if dict(r)["estado"] in ("Pendiente","Crítico","Moderado"))
     })
 
 
@@ -547,12 +547,12 @@ def resolver_desvio(dev_id):
     conn.execute("""UPDATE desvios SET estado=?, valor_correcto=?, revisado_por=?, fecha_revision=?
                     WHERE id=?""", (nuevo_estado, valor_correcto, usuario, ahora, dev_id))
     conn.execute("INSERT INTO auditoria (tipo,usuario,operacion,resultado,equipo) VALUES (?,?,?,?,?)",
-                 ("CORRECCIÃN", usuario, f"DesvÃ­o #{dev_id} resuelto", f"â {nuevo_estado}", request.remote_addr))
+                 ("CORRECCIÓN", usuario, f"Desvío #{dev_id} resuelto", f"✓ {nuevo_estado}", request.remote_addr))
     conn.commit()
     conn.close()
 
     return jsonify({
-        "mensaje": f"â DesvÃ­o {nuevo_estado.lower()} correctamente. AutoData actualizÃ³ la base de datos.",
+        "mensaje": f"✓ Desvío {nuevo_estado.lower()} correctamente. AutoData actualizó la base de datos.",
         "desvio_id": dev_id,
         "estado": nuevo_estado,
         "revisado_por": usuario,
@@ -560,9 +560,9 @@ def resolver_desvio(dev_id):
     })
 
 
-# âââââââââââââââââââââââââââââââââââââââââââââââ
-# API REST â AUTOMATIZACIONES
-# âââââââââââââââââââââââââââââââââââââââââââââââ
+# ═══════════════════════════════════════════════
+# API REST — AUTOMATIZACIONES
+# ═══════════════════════════════════════════════
 
 @app.route("/ad-api/automations")
 @requiere_auth
@@ -576,20 +576,20 @@ def get_automatizaciones():
 @app.route("/ad-api/automations/<int:auto_id>/execute", methods=["POST"])
 @requiere_auth
 def ejecutar_automatizacion(auto_id):
-    """Simula ejecuciÃ³n de automatizaciÃ³n con progreso por etapas"""
+    """Simula ejecución de automatización con progreso por etapas"""
     conn = get_db()
     auto = conn.execute("SELECT * FROM automatizaciones WHERE id=?", (auto_id,)).fetchone()
     if not auto:
         conn.close()
-        return jsonify({"error": True, "mensaje": "AutomatizaciÃ³n no encontrada."}), 404
+        return jsonify({"error": True, "mensaje": "Automatización no encontrada."}), 404
 
     ahora = datetime.utcnow().isoformat()
-    resultado = "â 8 facturas nuevas procesadas."
+    resultado = "✓ 8 facturas nuevas procesadas."
     conn.execute("UPDATE automatizaciones SET ultima_ejecucion=?, ultimo_resultado=? WHERE id=?",
                  (ahora, resultado, auto_id))
     conn.execute("INSERT INTO auditoria (tipo,usuario,operacion,resultado,equipo) VALUES (?,?,?,?,?)",
-                 ("AUTOMATIZACIÃN", request.usuario["email"],
-                  f"EjecuciÃ³n manual: {dict(auto)['nombre']}", resultado, request.remote_addr))
+                 ("AUTOMATIZACIÓN", request.usuario["email"],
+                  f"Ejecución manual: {dict(auto)['nombre']}", resultado, request.remote_addr))
     conn.commit()
     conn.close()
 
@@ -599,21 +599,21 @@ def ejecutar_automatizacion(auto_id):
         "ejecutado_por": request.usuario["email"],
         "timestamp": ahora,
         "etapas": [
-            "â Conectando con fuente...",
-            "â Analizando documentos...",
-            "â Extrayendo datos con IA...",
-            "â Verificando calidad...",
-            "â Actualizando base de datos...",
-            "â SincronizaciÃ³n completada."
+            "✓ Conectando con fuente...",
+            "✓ Analizando documentos...",
+            "✓ Extrayendo datos con IA...",
+            "✓ Verificando calidad...",
+            "✓ Actualizando base de datos...",
+            "✓ Sincronización completada."
         ],
         "facturas_procesadas": 8,
         "desvios_detectados": 1
     })
 
 
-# âââââââââââââââââââââââââââââââââââââââââââââââ
-# API REST â AUDITORÃA
-# âââââââââââââââââââââââââââââââââââââââââââââââ
+# ═══════════════════════════════════════════════
+# API REST — AUDITORÍA
+# ═══════════════════════════════════════════════
 
 @app.route("/ad-api/audit")
 @requiere_auth
@@ -637,15 +637,15 @@ def get_auditoria():
     })
 
 
-# âââââââââââââââââââââââââââââââââââââââââââââââ
+# ═══════════════════════════════════════════════
 # MANEJO DE ERRORES BRANDED
-# âââââââââââââââââââââââââââââââââââââââââââââââ
+# ═══════════════════════════════════════════════
 
 @app.errorhandler(404)
 def not_found(e):
     return jsonify({
         "error": True, "codigo": "AD-4004",
-        "mensaje": "AutoData no encontrÃ³ el recurso solicitado.",
+        "mensaje": "AutoData no encontró el recurso solicitado.",
         "soporte": "soporte@autodata.com"
     }), 404
 
@@ -654,19 +654,19 @@ def not_found(e):
 def server_error(e):
     return jsonify({
         "error": True, "codigo": "AD-5000",
-        "mensaje": "AutoData encontrÃ³ un problema procesando tu solicitud.",
+        "mensaje": "AutoData encontró un problema procesando tu solicitud.",
         "soporte": "soporte@autodata.com"
     }), 500
 
 
-# âââââââââââââââââââââââââââââââââââââââââââââââ
+# ═══════════════════════════════════════════════
 # INICIO
-# âââââââââââââââââââââââââââââââââââââââââââââââ
+# ═══════════════════════════════════════════════
 
 if __name__ == "__main__":
     init_db()
-    print(f"\nð AutoData v{VERSION} â Servidor iniciado")
+    print(f"\n🚀 AutoData v{VERSION} — Servidor iniciado")
     print(f"   Puerto: {PORT}")
     print(f"   DB: {DB_PATH}")
-    print(f"   Â© 2025 AutoData Technologies â autodata.com\n")
+    print(f"   © 2025 AutoData Technologies — autodata.com\n")
     app.run(host="0.0.0.0", port=PORT, debug=False)
