@@ -755,7 +755,7 @@ document.getElementById('processBtn').addEventListener('click', async function()
             // Update results table
             updateResultsTable(result.documents || []);
         } else {
-            statusMsg.textContent = '❌ Error: ' + (result.error || 'Error desconocido');
+            statusMsg.textContent = '❌ ' + (result.mensaje || result.error || 'Error desconocido');
             statusMsg.className = 'status-message error';
         }
     } catch (error) {
