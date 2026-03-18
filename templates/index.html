@@ -1,1 +1,2788 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoData - Portal Premium de Gestión de Facturas</title>
 
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --ad-primary: #0A1628;
+            --ad-accent: #00D4AA;
+            --ad-gold: #C9A84C;
+            --ad-surface: #F5F7FA;
+            --ad-dark: #060E1A;
+            --ad-alert: #FF4D4F;
+            --ad-warning: #FAAD14;
+            --ad-success: #52C41A;
+            --ad-deviation: #FF8C00;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            font-family: 'Inter', sans-serif;
+            background: var(--ad-dark);
+            color: #fff;
+            overflow: hidden;
+        }
+
+        /* PANTALLA LOGIN */
+        .login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--ad-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 1;
+            transition: opacity 0.6s ease-out, visibility 0.6s ease-out;
+            visibility: visible;
+        }
+
+        .login-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        #login-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .login-card {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 420px;
+            background: rgba(10, 22, 40, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 212, 170, 0.2);
+            border-radius: 16px;
+            padding: 48px 32px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-logo {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .login-logo h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.5px;
+            margin-bottom: 8px;
+        }
+
+        .login-logo p {
+            font-size: 13px;
+            color: var(--ad-accent);
+            font-weight: 500;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .form-group {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .form-group input {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-size: 14px;
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            transition: var(--transition);
+        }
+
+        .form-group input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .form-group input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(0, 212, 170, 0.4);
+            box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.1);
+        }
+
+        .form-group input.valid {
+            border-color: var(--ad-success);
+            background: rgba(82, 196, 26, 0.08);
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 14px;
+            top: 32px;
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.5);
+            transition: var(--transition);
+            background: none;
+            border: none;
+            padding: 4px;
+        }
+
+        .password-toggle:hover {
+            color: var(--ad-accent);
+        }
+
+        .login-button {
+            background: linear-gradient(135deg, var(--ad-accent) 0%, #00B894 100%);
+            border: none;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--ad-dark);
+            cursor: pointer;
+            margin-top: 8px;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .login-button:hover {
+            box-shadow: 0 12px 32px rgba(0, 212, 170, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .login-button.loading {
+            pointer-events: none;
+            opacity: 0.8;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(6, 14, 26, 0.2);
+            border-top-color: var(--ad-dark);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .login-footer {
+            margin-top: 24px;
+            text-align: center;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .login-footer a {
+            color: var(--ad-accent);
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        .login-footer a:hover {
+            color: #fff;
+        }
+
+        /* APP LAYOUT */
+        .app-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 0.6s ease-out;
+            visibility: hidden;
+        }
+
+        .app-container.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .sidebar {
+            width: 260px;
+            background: var(--ad-primary);
+            border-right: 1px solid rgba(0, 212, 170, 0.1);
+            display: flex;
+            flex-direction: column;
+            padding: 24px 0;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .sidebar-logo {
+            padding: 0 20px;
+            margin-bottom: 32px;
+            font-size: 20px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.5px;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 0 12px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 14px;
+            font-weight: 500;
+            position: relative;
+        }
+
+        .nav-item:hover {
+            background: rgba(0, 212, 170, 0.1);
+            color: var(--ad-accent);
+        }
+
+        .nav-item.active {
+            background: rgba(0, 212, 170, 0.15);
+            color: var(--ad-accent);
+            font-weight: 600;
+        }
+
+        .nav-item svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .nav-badge {
+            background: var(--ad-deviation);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: auto;
+        }
+
+        .sidebar-footer {
+            padding: 20px;
+            border-top: 1px solid rgba(0, 212, 170, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .sidebar-user {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--ad-accent) 0%, #00B894 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+
+        .user-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .user-company {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .logout-button {
+            background: rgba(255, 77, 79, 0.15);
+            border: 1px solid rgba(255, 77, 79, 0.3);
+            color: var(--ad-alert);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            width: 100%;
+        }
+
+        .logout-button:hover {
+            background: rgba(255, 77, 79, 0.25);
+            border-color: rgba(255, 77, 79, 0.5);
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0F1B2E 0%, #060E1A 100%);
+        }
+
+        .top-bar {
+            background: rgba(10, 22, 40, 0.6);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 212, 170, 0.1);
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .top-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex: 1;
+        }
+
+        .company-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .badge-pill {
+            background: rgba(0, 212, 170, 0.2);
+            color: var(--ad-accent);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sync-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .sync-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--ad-success);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .top-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .icon-button {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: var(--transition);
+            position: relative;
+        }
+
+        .icon-button:hover {
+            background: rgba(0, 212, 170, 0.1);
+            color: var(--ad-accent);
+        }
+
+        .icon-button svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: var(--ad-alert);
+            color: #fff;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+            border: 2px solid var(--ad-primary);
+        }
+
+        .sync-button {
+            background: linear-gradient(135deg, var(--ad-accent) 0%, #00B894 100%);
+            border: none;
+            color: var(--ad-dark);
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: var(--transition);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sync-button:hover {
+            box-shadow: 0 8px 20px rgba(0, 212, 170, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 32px;
+        }
+
+        .page {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.4s ease-out;
+        }
+
+        .page.active {
+            display: block;
+            opacity: 1;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 32px;
+            color: #fff;
+        }
+
+        /* DASHBOARD */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .kpi-card {
+            background: rgba(10, 22, 40, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 212, 170, 0.15);
+            border-radius: 12px;
+            padding: 24px;
+            transition: var(--transition);
+        }
+
+        .kpi-card:hover {
+            border-color: rgba(0, 212, 170, 0.3);
+            transform: translateY(-4px);
+        }
+
+        .kpi-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .kpi-label {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .kpi-icon {
+            width: 24px;
+            height: 24px;
+            color: var(--ad-accent);
+        }
+
+        .kpi-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .kpi-change {
+            font-size: 12px;
+            color: var(--ad-success);
+            font-weight: 600;
+        }
+
+        .kpi-change.negative {
+            color: var(--ad-alert);
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        @media (max-width: 1024px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-card {
+            background: rgba(10, 22, 40, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 212, 170, 0.15);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .chart-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #fff;
+        }
+
+        .insights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .insight-card {
+            background: rgba(10, 22, 40, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 212, 170, 0.15);
+            border-radius: 12px;
+            padding: 20px;
+            font-size: 14px;
+            line-height: 1.6;
+            transition: var(--transition);
+        }
+
+        .insight-card:hover {
+            border-color: rgba(0, 212, 170, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* AUTOMATIZACIONES */
+        .automations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+        }
+
+        .automation-card {
+            background: rgba(10, 22, 40, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 212, 170, 0.15);
+            border-radius: 12px;
+            padding: 24px;
+            transition: var(--transition);
+        }
+
+        .automation-card:hover {
+            border-color: rgba(0, 212, 170, 0.3);
+        }
+
+        .automation-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .automation-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #fff;
+            flex: 1;
+        }
+
+        .automation-details {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .automation-details strong {
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 600;
+        }
+
+        .automation-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .action-button {
+            background: rgba(0, 212, 170, 0.2);
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            color: var(--ad-accent);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .action-button:hover {
+            background: rgba(0, 212, 170, 0.3);
+            border-color: var(--ad-accent);
+        }
+
+        .action-button.pause {
+            background: rgba(250, 173, 20, 0.2);
+            border-color: rgba(250, 173, 20, 0.3);
+            color: var(--ad-warning);
+        }
+
+        .action-button.pause:hover {
+            background: rgba(250, 173, 20, 0.3);
+            border-color: var(--ad-warning);
+        }
+
+        .action-button.secondary {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .action-button.secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 8px;
+            display: none;
+        }
+
+        .progress-bar.active {
+            display: block;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--ad-accent) 0%, #00B894 100%);
+            border-radius: 2px;
+            width: 0%;
+            animation: progress 3s ease-out forwards;
+        }
+
+        @keyframes progress {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+
+        .progress-stage {
+            font-size: 11px;
+            color: var(--ad-accent);
+            margin-top: 8px;
+            font-weight: 600;
+            display: none;
+        }
+
+        .progress-stage.active {
+            display: block;
+        }
+
+        /* DESVÍOS */
+        .deviations-header {
+            background: rgba(255, 140, 0, 0.15);
+            border: 1px solid rgba(255, 140, 0, 0.3);
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 32px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .deviations-header-icon {
+            width: 28px;
+            height: 28px;
+            color: var(--ad-deviation);
+            flex-shrink: 0;
+        }
+
+        .deviations-header-text {
+            font-size: 15px;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .deviations-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .deviation-stat {
+            background: rgba(10, 22, 40, 0.6);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .deviation-stat-icon {
+            width: 24px;
+            height: 24px;
+            flex-shrink: 0;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .deviation-stat-icon.critical {
+            background: rgba(255, 77, 79, 0.2);
+            color: var(--ad-alert);
+        }
+
+        .deviation-stat-icon.moderate {
+            background: rgba(255, 140, 0, 0.2);
+            color: var(--ad-deviation);
+        }
+
+        .deviation-stat-icon.verified {
+            background: rgba(82, 196, 26, 0.2);
+            color: var(--ad-success);
+        }
+
+        .deviation-stat-icon.average {
+            background: rgba(0, 212, 170, 0.2);
+            color: var(--ad-accent);
+        }
+
+        .deviation-stat-label {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            font-weight: 500;
+        }
+
+        .deviation-stat-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .deviations-table {
+            background: rgba(10, 22, 40, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 212, 170, 0.15);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .table-header {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1.5fr 1fr 1fr 1.2fr;
+            background: rgba(0, 212, 170, 0.1);
+            padding: 16px 20px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: rgba(255, 255, 255, 0.7);
+            gap: 12px;
+        }
+
+        .table-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1.5fr 1fr 1fr 1.2fr;
+            align-items: center;
+            padding: 16px 20px;
+            border-top: 1px solid rgba(0, 212, 170, 0.1);
+            font-size: 13px;
+            color: #fff;
+            gap: 12px;
+            transition: var(--transition);
+        }
+
+        .table-row:hover {
+            background: rgba(0, 212, 170, 0.05);
+        }
+
+        .table-row.critical {
+            background: rgba(255, 77, 79, 0.08);
+            border-left: 3px solid var(--ad-alert);
+        }
+
+        .table-row.moderate {
+            background: rgba(255, 140, 0, 0.08);
+            border-left: 3px solid var(--ad-deviation);
+        }
+
+        .deviation-status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .deviation-status-badge.pending {
+            background: rgba(250, 173, 20, 0.2);
+            color: var(--ad-warning);
+        }
+
+        .deviation-status-badge.critical {
+            background: rgba(255, 77, 79, 0.2);
+            color: var(--ad-alert);
+        }
+
+        .deviation-status-badge.moderate {
+            background: rgba(255, 140, 0, 0.2);
+            color: var(--ad-deviation);
+        }
+
+        .deviation-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .deviation-action {
+            background: none;
+            border: none;
+            color: var(--ad-accent);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 6px 8px;
+            border-radius: 4px;
+            transition: var(--transition);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .deviation-action:hover {
+            background: rgba(0, 212, 170, 0.2);
+        }
+
+        .deviation-action.confirm {
+            color: var(--ad-success);
+        }
+
+        .deviation-action.confirm:hover {
+            background: rgba(82, 196, 26, 0.2);
+        }
+
+        .deviation-action.reject {
+            color: var(--ad-alert);
+        }
+
+        .deviation-action.reject:hover {
+            background: rgba(255, 77, 79, 0.2);
+        }
+
+        /* FACTURAS */
+        .search-filter-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 250px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 14px;
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .search-input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .search-input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(0, 212, 170, 0.4);
+        }
+
+        .filter-select {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 13px;
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: rgba(0, 212, 170, 0.4);
+        }
+
+        .export-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .export-button {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.7);
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .export-button:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+        }
+
+        .invoices-table {
+            background: rgba(10, 22, 40, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 212, 170, 0.15);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .table-header-invoices {
+            display: grid;
+            grid-template-columns: 50px 1.2fr 1fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr;
+            background: rgba(0, 212, 170, 0.1);
+            padding: 16px 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: rgba(255, 255, 255, 0.7);
+            gap: 8px;
+        }
+
+        .table-row-invoice {
+            display: grid;
+            grid-template-columns: 50px 1.2fr 1fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr;
+            align-items: center;
+            padding: 14px 20px;
+            border-top: 1px solid rgba(0, 212, 170, 0.1);
+            font-size: 13px;
+            color: #fff;
+            gap: 8px;
+        }
+
+        .table-row-invoice:hover {
+            background: rgba(0, 212, 170, 0.05);
+        }
+
+        .invoice-status-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .invoice-status-indicator.paid {
+            background: rgba(82, 196, 26, 0.2);
+            color: var(--ad-success);
+        }
+
+        .invoice-status-indicator.pending {
+            background: rgba(250, 173, 20, 0.2);
+            color: var(--ad-warning);
+        }
+
+        .invoice-status-indicator.overdue {
+            background: rgba(255, 77, 79, 0.2);
+            color: var(--ad-alert);
+        }
+
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(0, 212, 170, 0.1);
+        }
+
+        .pagination-button {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .pagination-button:hover {
+            background: rgba(0, 212, 170, 0.2);
+            border-color: rgba(0, 212, 170, 0.3);
+        }
+
+        .pagination-button.active {
+            background: var(--ad-accent);
+            color: var(--ad-dark);
+            border-color: var(--ad-accent);
+        }
+
+        /* CONFIGURACIÓN */
+        .settings-tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 32px;
+            border-bottom: 1px solid rgba(0, 212, 170, 0.1);
+        }
+
+        .tab-button {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            padding: 12px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: var(--transition);
+        }
+
+        .tab-button:hover {
+            color: var(--ad-accent);
+        }
+
+        .tab-button.active {
+            color: var(--ad-accent);
+            border-bottom-color: var(--ad-accent);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .settings-form {
+            display: grid;
+            gap: 20px;
+            max-width: 600px;
+        }
+
+        .form-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-label {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .form-input {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-size: 14px;
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            transition: var(--transition);
+        }
+
+        .form-input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(0, 212, 170, 0.4);
+        }
+
+        .form-input:disabled {
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.5);
+            cursor: not-allowed;
+        }
+
+        .form-input-text {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 4px;
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .settings-card {
+            background: rgba(10, 22, 40, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 212, 170, 0.15);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .settings-card-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .settings-card-status {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-left: auto;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-active {
+            background: rgba(82, 196, 26, 0.2);
+            color: var(--ad-success);
+        }
+
+        .status-inactive {
+            background: rgba(255, 77, 79, 0.2);
+            color: var(--ad-alert);
+        }
+
+        .settings-card-details {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            line-height: 1.6;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .toggle-switch.active {
+            background: rgba(0, 212, 170, 0.3);
+            border-color: var(--ad-accent);
+        }
+
+        .toggle-knob {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            border-radius: 50%;
+            transition: var(--transition);
+        }
+
+        .toggle-switch.active .toggle-knob {
+            left: 22px;
+        }
+
+        .users-table {
+            background: rgba(10, 22, 40, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 212, 170, 0.15);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .users-table-header {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            background: rgba(0, 212, 170, 0.1);
+            padding: 16px 20px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: rgba(255, 255, 255, 0.7);
+            gap: 12px;
+        }
+
+        .users-table-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            align-items: center;
+            padding: 16px 20px;
+            border-top: 1px solid rgba(0, 212, 170, 0.1);
+            font-size: 13px;
+            color: #fff;
+            gap: 12px;
+        }
+
+        .user-role-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            width: fit-content;
+        }
+
+        .role-admin {
+            background: rgba(0, 212, 170, 0.2);
+            color: var(--ad-accent);
+        }
+
+        .role-operator {
+            background: rgba(250, 173, 20, 0.2);
+            color: var(--ad-warning);
+        }
+
+        .role-viewer {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .plan-card {
+            background: rgba(10, 22, 40, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid var(--ad-accent);
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 500px;
+        }
+
+        .plan-name {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .plan-status {
+            display: inline-block;
+            background: rgba(82, 196, 26, 0.2);
+            color: var(--ad-success);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 24px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .plan-details {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 24px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .usage-bar-container {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid rgba(0, 212, 170, 0.1);
+        }
+
+        .usage-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .usage-progress {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .usage-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--ad-accent) 0%, var(--ad-deviation) 100%);
+            border-radius: 4px;
+            width: 169%; /* 847/500 = 1.694 = 169.4% */
+        }
+
+        .usage-text {
+            font-size: 12px;
+            color: var(--ad-deviation);
+            margin-top: 8px;
+            font-weight: 600;
+        }
+
+        .recommend-badge {
+            background: rgba(255, 140, 0, 0.2);
+            color: var(--ad-deviation);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 12px;
+            display: inline-block;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 220px;
+                padding: 16px 0;
+            }
+
+            .content-area {
+                padding: 20px;
+            }
+
+            .page-title {
+                font-size: 22px;
+                margin-bottom: 20px;
+            }
+
+            .kpi-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .top-bar {
+                flex-direction: column;
+                gap: 12px;
+                padding: 12px 16px;
+            }
+
+            .top-bar-left {
+                flex-direction: column;
+                gap: 8px;
+                width: 100%;
+            }
+
+            .top-bar-right {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .search-filter-bar {
+                flex-direction: column;
+            }
+
+            .search-input {
+                min-width: unset;
+            }
+
+            .table-header,
+            .table-row,
+            .table-header-invoices,
+            .table-row-invoice,
+            .users-table-header,
+            .users-table-row {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            .automations-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* SCROLLBAR */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 212, 170, 0.05);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 212, 170, 0.3);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 212, 170, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <!-- LOGIN SCREEN -->
+    <div class="login-screen" id="loginScreen">
+        <canvas id="login-canvas"></canvas>
+        <div class="login-card">
+            <div class="login-logo">
+                <h1>AutoData</h1>
+                <p>Tu información, siempre al día.</p>
+            </div>
+            <form class="login-form" id="loginForm">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input
+                        type="email"
+                        id="email"
+                        placeholder="email@empresa.com"
+                        required
+                    >
+                </div>
+                <div class="form-group">
+                    <label for="password">Contraseña</label>
+                    <input
+                        type="password"
+                        id="password"
+                        placeholder="••••••••"
+                        required
+                    >
+                    <button type="button" class="password-toggle" id="passwordToggle">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
+                </div>
+                <button type="submit" class="login-button">Ingresar a AutoData</button>
+            </form>
+            <div class="login-footer">
+                <p>Demo: demo@dataintelligence.com / AutoData2025</p>
+                <p>¿Necesitas ayuda? <a href="mailto:soporte@autodata.com">soporte@autodata.com</a></p>
+                <p style="margin-top: 16px; font-size: 11px;">© 2025 AutoData Technologies v2.4.1</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- APP CONTAINER -->
+    <div class="app-container" id="appContainer">
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <div class="sidebar-logo">AutoData</div>
+            <nav class="sidebar-nav">
+                <div class="nav-item active" data-page="dashboard">
+                    <svg class="lucide" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    <span>Dashboard</span>
+                </div>
+                <div class="nav-item" data-page="invoices">
+                    <svg class="lucide" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M13.75 2.75h-10a2 2 0 0 0-2 2v14.5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4.75a2 2 0 0 0-2-2z"></path>
+                        <path d="M18 8v-3.25"></path>
+                        <path d="M9 13h4"></path>
+                        <path d="M9 17h4"></path>
+                    </svg>
+                    <span>Facturas</span>
+                </div>
+                <div class="nav-item" data-page="deviations">
+                    <svg class="lucide" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <span>Desvíos</span>
+                    <span class="nav-badge">3</span>
+                </div>
+                <div class="nav-item" data-page="automations">
+                    <svg class="lucide" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path>
+                    </svg>
+                    <span>Automatizaciones</span>
+                </div>
+                <div class="nav-item" data-page="users">
+                    <svg class="lucide" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span>Usuarios</span>
+                </div>
+                <div class="nav-item" data-page="settings">
+                    <svg class="lucide" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m2.12 2.12l4.24 4.24M1 12h6m6 0h6m-1.78 7.78l-4.24-4.24m-2.12-2.12l-4.24-4.24"></path>
+                    </svg>
+                    <span>Configuración</span>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="sidebar-user" id="userButton">
+                    <div class="user-avatar">DI</div>
+                    <div class="user-info">
+                        <div class="user-company">Dataintelligence.com</div>
+                    </div>
+                </div>
+                <button class="logout-button" id="logoutButton">Cerrar sesión</button>
+            </div>
+        </div>
+
+        <!-- MAIN CONTENT -->
+        <div class="main-content">
+            <!-- TOP BAR -->
+            <div class="top-bar">
+                <div class="top-bar-left">
+                    <div class="company-badge">
+                        Dataintelligence.com
+                        <span class="badge-pill">Professional</span>
+                    </div>
+                    <div class="sync-status">
+                        <span class="sync-dot"></span>
+                        Última sincronización: Hoy 09:47 — AutoData ✓
+                    </div>
+                </div>
+                <div class="top-bar-right">
+                    <button class="icon-button" id="notificationButton">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                        <span class="notification-badge">3</span>
+                    </button>
+                    <button class="sync-button" id="syncButton">
+                        <span>⚡</span> Sincronizar ahora
+                    </button>
+                </div>
+            </div>
+
+            <!-- CONTENT AREA -->
+            <div class="content-area">
+                <!-- DASHBOARD PAGE -->
+                <div class="page active" id="dashboardPage">
+                    <h1 class="page-title">Dashboard</h1>
+
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <div class="kpi-label">Total Facturas</div>
+                                <svg class="kpi-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M13.75 2.75h-10a2 2 0 0 0-2 2v14.5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4.75a2 2 0 0 0-2-2z"></path>
+                                </svg>
+                            </div>
+                            <div class="kpi-value">847</div>
+                            <div class="kpi-change">+12% este mes</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <div class="kpi-label">Monto Total</div>
+                                <svg class="kpi-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                                </svg>
+                            </div>
+                            <div class="kpi-value">$2.847.360</div>
+                            <div class="kpi-change">ARS</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <div class="kpi-label">Pendientes</div>
+                                <svg class="kpi-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <polyline points="12 6 12 12 16 14"></polyline>
+                                </svg>
+                            </div>
+                            <div class="kpi-value">$384.200</div>
+                            <div class="kpi-change" style="color: var(--ad-warning);">De pago</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <div class="kpi-label">Vencidas</div>
+                                <svg class="kpi-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                </svg>
+                            </div>
+                            <div class="kpi-value">7</div>
+                            <div class="kpi-change" style="color: var(--ad-alert);">Facturas</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <div class="kpi-label">Desvíos Pendientes</div>
+                                <svg class="kpi-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                </svg>
+                            </div>
+                            <div class="kpi-value">3</div>
+                            <div class="kpi-change" style="color: var(--ad-deviation);">Documentos</div>
+                        </div>
+                    </div>
+
+                    <div class="charts-grid">
+                        <div class="chart-card">
+                            <div class="chart-title">Facturas por Mes (últimos 6 meses)</div>
+                            <canvas id="monthlyChart"></canvas>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-title">Distribución por Categoría</div>
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    </div>
+
+                    <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 20px;">Insights AutoData</h2>
+                    <div class="insights-grid">
+                        <div class="insight-card">
+                            <div>📈 Los proveedores de servicios aumentaron un 18% vs mes anterior.</div>
+                        </div>
+                        <div class="insight-card">
+                            <div>⚠ 3 facturas de Proveedor Technika S.A. están por vencer en 5 días.</div>
+                        </div>
+                        <div class="insight-card">
+                            <div>✓ La tasa de desvíos bajó al 3.2% — el mejor registro histórico.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FACTURAS PAGE -->
+                <div class="page" id="invoicesPage">
+                    <h1 class="page-title">Facturas</h1>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                        <div class="search-filter-bar" style="flex: 1; margin-bottom: 0;">
+                            <input type="text" class="search-input" placeholder="Buscar proveedor, número...">
+                            <select class="filter-select">
+                                <option>Todos los estados</option>
+                                <option>Pagadas</option>
+                                <option>Pendientes</option>
+                                <option>Vencidas</option>
+                            </select>
+                            <select class="filter-select">
+                                <option>Todas las fechas</option>
+                                <option>Este mes</option>
+                                <option>Último mes</option>
+                            </select>
+                        </div>
+                        <div class="export-buttons">
+                            <button class="export-button">📊 Excel</button>
+                            <button class="export-button">📄 PDF</button>
+                            <button class="export-button">📋 CSV</button>
+                        </div>
+                    </div>
+
+                    <div class="invoices-table">
+                        <div class="table-header-invoices">
+                            <div>#</div>
+                            <div>Proveedor</div>
+                            <div>CUIT</div>
+                            <div>Fecha</div>
+                            <div>Tipo</div>
+                            <div>N° Factura</div>
+                            <div>Subtotal</div>
+                            <div>IVA</div>
+                            <div>Total</div>
+                            <div>Estado</div>
+                        </div>
+                        <div class="table-row-invoice">
+                            <div>1</div>
+                            <div><strong>Technika S.A.</strong></div>
+                            <div>30-71234567-9</div>
+                            <div>15/01/2025</div>
+                            <div>A</div>
+                            <div>0001-00000089</div>
+                            <div>$38.000</div>
+                            <div>$7.980</div>
+                            <div>$45.980</div>
+                            <div><span class="invoice-status-indicator paid">✓</span></div>
+                        </div>
+                        <div class="table-row-invoice">
+                            <div>2</div>
+                            <div><strong>Cloud Services SRL</strong></div>
+                            <div>30-68123456-8</div>
+                            <div>18/01/2025</div>
+                            <div>A</div>
+                            <div>0003-00000412</div>
+                            <div>$125.000</div>
+                            <div>$26.250</div>
+                            <div>$151.250</div>
+                            <div><span class="invoice-status-indicator paid">✓</span></div>
+                        </div>
+                        <div class="table-row-invoice">
+                            <div>3</div>
+                            <div><strong>Oficorp SA</strong></div>
+                            <div>30-59876543-2</div>
+                            <div>22/01/2025</div>
+                            <div>B</div>
+                            <div>0001-00000201</div>
+                            <div>$8.500</div>
+                            <div>$0</div>
+                            <div>$8.500</div>
+                            <div><span class="invoice-status-indicator paid">✓</span></div>
+                        </div>
+                        <div class="table-row-invoice">
+                            <div>4</div>
+                            <div><strong>DataSec Solutions</strong></div>
+                            <div>30-71890123-4</div>
+                            <div>28/01/2025</div>
+                            <div>A</div>
+                            <div>0001-00000056</div>
+                            <div>$45.000</div>
+                            <div>$9.450</div>
+                            <div>$54.450</div>
+                            <div><span class="invoice-status-indicator pending">⏱</span></div>
+                        </div>
+                        <div class="table-row-invoice">
+                            <div>5</div>
+                            <div><strong>Recursos Plus SA</strong></div>
+                            <div>30-62345678-5</div>
+                            <div>02/02/2025</div>
+                            <div>A</div>
+                            <div>0002-00000089</div>
+                            <div>$180.000</div>
+                            <div>$37.800</div>
+                            <div>$217.800</div>
+                            <div><span class="invoice-status-indicator paid">✓</span></div>
+                        </div>
+                        <div class="table-row-invoice">
+                            <div>6</div>
+                            <div><strong>Consultoría Global</strong></div>
+                            <div>30-65432109-8</div>
+                            <div>05/02/2025</div>
+                            <div>A</div>
+                            <div>0001-00000445</div>
+                            <div>$92.500</div>
+                            <div>$19.425</div>
+                            <div>$111.925</div>
+                            <div><span class="invoice-status-indicator overdue">✕</span></div>
+                        </div>
+                        <div class="table-row-invoice">
+                            <div>7</div>
+                            <div><strong>Tech Solutions Inc</strong></div>
+                            <div>30-55555555-5</div>
+                            <div>10/02/2025</div>
+                            <div>A</div>
+                            <div>0002-00000567</div>
+                            <div>$250.000</div>
+                            <div>$52.500</div>
+                            <div>$302.500</div>
+                            <div><span class="invoice-status-indicator paid">✓</span></div>
+                        </div>
+                        <div class="table-row-invoice">
+                            <div>8</div>
+                            <div><strong>Distribuidora ABC</strong></div>
+                            <div>30-44444444-4</div>
+                            <div>12/02/2025</div>
+                            <div>B</div>
+                            <div>0001-00000333</div>
+                            <div>$75.000</div>
+                            <div>$0</div>
+                            <div>$75.000</div>
+                            <div><span class="invoice-status-indicator pending">⏱</span></div>
+                        </div>
+                        <div class="table-row-invoice">
+                            <div>9</div>
+                            <div><strong>Servicios Integrales</strong></div>
+                            <div>30-33333333-3</div>
+                            <div>15/02/2025</div>
+                            <div>A</div>
+                            <div>0001-00000678</div>
+                            <div>$165.000</div>
+                            <div>$34.650</div>
+                            <div>$199.650</div>
+                            <div><span class="invoice-status-indicator pending">⏱</span></div>
+                        </div>
+                        <div class="table-row-invoice">
+                            <div>10</div>
+                            <div><strong>Proveedora Premium</strong></div>
+                            <div>30-22222222-2</div>
+                            <div>18/02/2025</div>
+                            <div>A</div>
+                            <div>0003-00000890</div>
+                            <div>$320.000</div>
+                            <div>$67.200</div>
+                            <div>$387.200</div>
+                            <div><span class="invoice-status-indicator paid">✓</span></div>
+                        </div>
+                        <div class="table-row-invoice">
+                            <div>11</div>
+                            <div><strong>Logística Express</strong></div>
+                            <div>30-11111111-1</div>
+                            <div>20/02/2025</div>
+                            <div>A</div>
+                            <div>0001-00000234</div>
+                            <div>$156.000</div>
+                            <div>$32.760</div>
+                            <div>$188.760</div>
+                            <div><span class="invoice-status-indicator overdue">✕</span></div>
+                        </div>
+                        <div class="table-row-invoice">
+                            <div>12</div>
+                            <div><strong>Empresa Constructora XYZ</strong></div>
+                            <div>30-99999999-9</div>
+                            <div>22/02/2025</div>
+                            <div>B</div>
+                            <div>0002-00000111</div>
+                            <div>$420.000</div>
+                            <div>$0</div>
+                            <div>$420.000</div>
+                            <div><span class="invoice-status-indicator paid">✓</span></div>
+                        </div>
+                        <div class="table-row-invoice">
+                            <div>13</div>
+                            <div><strong>Importaciones Directas</strong></div>
+                            <div>30-88888888-8</div>
+                            <div>25/02/2025</div>
+                            <div>A</div>
+                            <div>0001-00000999</div>
+                            <div>$215.000</div>
+                            <div>$45.150</div>
+                            <div>$260.150</div>
+                            <div><span class="invoice-status-indicator pending">⏱</span></div>
+                        </div>
+                        <div class="table-row-invoice">
+                            <div>14</div>
+                            <div><strong>Asesoría Fiscal Ltda</strong></div>
+                            <div>30-77777777-7</div>
+                            <div>28/02/2025</div>
+                            <div>A</div>
+                            <div>0001-00000432</div>
+                            <div>$45.000</div>
+                            <div>$9.450</div>
+                            <div>$54.450</div>
+                            <div><span class="invoice-status-indicator overdue">✕</span></div>
+                        </div>
+                        <div class="table-row-invoice">
+                            <div>15</div>
+                            <div><strong>Software House Global</strong></div>
+                            <div>30-66666666-6</div>
+                            <div>05/03/2025</div>
+                            <div>A</div>
+                            <div>0002-00000765</div>
+                            <div>$380.000</div>
+                            <div>$79.800</div>
+                            <div>$459.800</div>
+                            <div><span class="invoice-status-indicator paid">✓</span></div>
+                        </div>
+                    </div>
+
+                    <div class="pagination">
+                        <button class="pagination-button active">1</button>
+                        <button class="pagination-button">2</button>
+                        <button class="pagination-button">3</button>
+                        <button class="pagination-button">...</button>
+                        <button class="pagination-button">58</button>
+                    </div>
+                </div>
+
+                <!-- DESVÍOS PAGE -->
+                <div class="page" id="deviationsPage">
+                    <h1 class="page-title">Desvíos Detectados</h1>
+
+                    <div class="deviations-header">
+                        <svg class="deviations-header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                        <div class="deviations-header-text">AutoData detectó 3 documentos que requieren tu revisión.</div>
+                    </div>
+
+                    <div class="deviations-summary">
+                        <div class="deviation-stat">
+                            <div class="deviation-stat-icon critical">🔴</div>
+                            <div>
+                                <div class="deviation-stat-label">Críticos</div>
+                                <div class="deviation-stat-value">1</div>
+                            </div>
+                        </div>
+                        <div class="deviation-stat">
+                            <div class="deviation-stat-icon moderate">🟠</div>
+                            <div>
+                                <div class="deviation-stat-label">Moderados</div>
+                                <div class="deviation-stat-value">2</div>
+                            </div>
+                        </div>
+                        <div class="deviation-stat">
+                            <div class="deviation-stat-icon verified">🟢</div>
+                            <div>
+                                <div class="deviation-stat-label">Verificados hoy</div>
+                                <div class="deviation-stat-value">5</div>
+                            </div>
+                        </div>
+                        <div class="deviation-stat">
+                            <div class="deviation-stat-icon average">🔵</div>
+                            <div>
+                                <div class="deviation-stat-label">Tiempo promedio</div>
+                                <div class="deviation-stat-value">4 min</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="deviations-table">
+                        <div class="table-header" style="grid-template-columns: 1.5fr 1fr 1.5fr 1fr 1fr 1fr;">
+                            <div>Documento</div>
+                            <div>Código</div>
+                            <div>Problema Detectado</div>
+                            <div>Confianza IA</div>
+                            <div>Estado</div>
+                            <div>Acciones</div>
+                        </div>
+                        <div class="table-row critical" style="grid-template-columns: 1.5fr 1fr 1.5fr 1fr 1fr 1fr;">
+                            <div><strong>factura_technika_089.pdf</strong></div>
+                            <div>[NUM-001]</div>
+                            <div>Totales inconsistentes (Campo: Total)</div>
+                            <div>IA detectó: $45.200</div>
+                            <div><span class="deviation-status-badge pending">Pendiente</span></div>
+                            <div class="deviation-actions">
+                                <button class="deviation-action">Ver</button>
+                                <button class="deviation-action confirm">✓ Confirmar</button>
+                                <button class="deviation-action reject">✕ Rechazar</button>
+                            </div>
+                        </div>
+                        <div class="table-row moderate" style="grid-template-columns: 1.5fr 1fr 1.5fr 1fr 1fr 1fr;">
+                            <div><strong>factura_proveedor_rrhh.jpg</strong></div>
+                            <div>[DOC-002]</div>
+                            <div>Imagen borrosa (Campo: Número de factura)</div>
+                            <div>IA detectó: 0001-0000?4 (45%)</div>
+                            <div><span class="deviation-status-badge critical">Crítico</span></div>
+                            <div class="deviation-actions">
+                                <button class="deviation-action">Ver</button>
+                                <button class="deviation-action confirm">✓ Confirmar</button>
+                                <button class="deviation-action reject">✕ Rechazar</button>
+                            </div>
+                        </div>
+                        <div class="table-row moderate" style="grid-template-columns: 1.5fr 1fr 1.5fr 1fr 1fr 1fr;">
+                            <div><strong>factura_servicios_marzo.pdf</strong></div>
+                            <div>[PRO-001]</div>
+                            <div>Proveedor desconocido (Campo: CUIT)</div>
+                            <div>IA detectó: 30-71234567-9 (85%)</div>
+                            <div><span class="deviation-status-badge pending">Moderado</span></div>
+                            <div class="deviation-actions">
+                                <button class="deviation-action">Ver</button>
+                                <button class="deviation-action confirm">✓ Confirmar</button>
+                                <button class="deviation-action reject">✕ Rechazar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AUTOMATIZACIONES PAGE -->
+                <div class="page" id="automationsPage">
+                    <h1 class="page-title">Automatizaciones</h1>
+
+                    <div class="automations-grid">
+                        <div class="automation-card">
+                            <div class="automation-header">
+                                <div class="automation-title">⚡ Sincronización diaria de facturas</div>
+                            </div>
+                            <div class="automation-details">
+                                <div><strong>Fuente:</strong> Google Drive — Carpeta "Facturas 2025"</div>
+                                <div><strong>Próxima:</strong> Mañana 08:00 AM</div>
+                                <div><strong>Última:</strong> Hoy 08:00 — ✓ 12 facturas</div>
+                            </div>
+                            <div class="automation-actions">
+                                <button class="action-button execute-button" data-automation="sync">▶ Ejecutar ahora</button>
+                                <button class="action-button pause">⏸ Pausar</button>
+                                <button class="action-button secondary">⚙ Configurar</button>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill"></div>
+                            </div>
+                            <div class="progress-stage"></div>
+                        </div>
+
+                        <div class="automation-card">
+                            <div class="automation-header">
+                                <div class="automation-title">🔍 Detección de desvíos</div>
+                            </div>
+                            <div class="automation-details">
+                                <div><strong>Estado:</strong> Activa</div>
+                                <div><strong>Última:</strong> Hoy 08:01 — 1 desvío detectado</div>
+                            </div>
+                            <div class="automation-actions">
+                                <button class="action-button secondary">📊 Ver detalles</button>
+                                <button class="action-button pause">⏸ Pausar</button>
+                            </div>
+                        </div>
+
+                        <div class="automation-card">
+                            <div class="automation-header">
+                                <div class="automation-title">📊 Actualización Excel AutoData</div>
+                            </div>
+                            <div class="automation-details">
+                                <div><strong>Última:</strong> Hoy 08:05 — ✓ Completado</div>
+                                <div><strong>Próxima:</strong> Mañana 08:05</div>
+                            </div>
+                            <div class="automation-actions">
+                                <button class="action-button execute-button" data-automation="excel">▶ Ejecutar ahora</button>
+                                <button class="action-button secondary">📥 Descargar</button>
+                            </div>
+                        </div>
+
+                        <div class="automation-card">
+                            <div class="automation-header">
+                                <div class="automation-title">📄 Reporte ejecutivo PDF semanal</div>
+                            </div>
+                            <div class="automation-details">
+                                <div><strong>Próximo:</strong> Lunes 07:00</div>
+                                <div><strong>Última:</strong> Lun 10/03 — ✓ Entregado</div>
+                            </div>
+                            <div class="automation-actions">
+                                <button class="action-button secondary">📄 Ver último</button>
+                                <button class="action-button pause">⏸ Pausar</button>
+                            </div>
+                        </div>
+
+                        <div class="automation-card">
+                            <div class="automation-header">
+                                <div class="automation-title">📧 Resumen semanal por email</div>
+                            </div>
+                            <div class="automation-details">
+                                <div><strong>Destinatarios:</strong> 3 usuarios</div>
+                                <div><strong>Día:</strong> Viernes 10:00</div>
+                            </div>
+                            <div class="automation-actions">
+                                <button class="action-button secondary">✉ Enviar ahora</button>
+                                <button class="action-button secondary">⚙ Configurar</button>
+                            </div>
+                        </div>
+
+                        <div class="automation-card">
+                            <div class="automation-header">
+                                <div class="automation-title">⏰ Alertas facturas por vencer</div>
+                            </div>
+                            <div class="automation-details">
+                                <div><strong>Umbral:</strong> 5 días</div>
+                                <div><strong>Estado:</strong> Activa</div>
+                            </div>
+                            <div class="automation-actions">
+                                <button class="action-button secondary">⚙ Configurar</button>
+                            </div>
+                        </div>
+
+                        <div class="automation-card">
+                            <div class="automation-header">
+                                <div class="automation-title">🚨 Alertas facturas vencidas</div>
+                            </div>
+                            <div class="automation-details">
+                                <div><strong>Estado:</strong> Activa</div>
+                                <div><strong>Última alerta:</strong> Ayer</div>
+                            </div>
+                            <div class="automation-actions">
+                                <button class="action-button secondary">📧 Historial</button>
+                            </div>
+                        </div>
+
+                        <div class="automation-card">
+                            <div class="automation-header">
+                                <div class="automation-title">💾 Backup automático</div>
+                            </div>
+                            <div class="automation-details">
+                                <div><strong>Frecuencia:</strong> Diario 02:00 AM</div>
+                                <div><strong>Última:</strong> Hoy 02:00 — ✓</div>
+                            </div>
+                            <div class="automation-actions">
+                                <button class="action-button secondary">🔄 Restaurar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- USUARIOS PAGE -->
+                <div class="page" id="usersPage">
+                    <h1 class="page-title">Gestión de Usuarios</h1>
+
+                    <div class="users-table">
+                        <div class="users-table-header">
+                            <div>Nombre</div>
+                            <div>Email</div>
+                            <div>Rol</div>
+                            <div>Acciones</div>
+                        </div>
+                        <div class="users-table-row">
+                            <div><strong>Guillermo Martínez</strong></div>
+                            <div>guillermo@dataintelligence.com</div>
+                            <div><span class="user-role-badge role-admin">Admin</span></div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="action-button secondary" style="padding: 6px 12px; font-size: 11px;">Editar</button>
+                                <button class="action-button secondary" style="padding: 6px 12px; font-size: 11px;">Eliminar</button>
+                            </div>
+                        </div>
+                        <div class="users-table-row">
+                            <div><strong>Ana María García</strong></div>
+                            <div>ana.garcia@dataintelligence.com</div>
+                            <div><span class="user-role-badge role-operator">Operadora</span></div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="action-button secondary" style="padding: 6px 12px; font-size: 11px;">Editar</button>
+                                <button class="action-button secondary" style="padding: 6px 12px; font-size: 11px;">Eliminar</button>
+                            </div>
+                        </div>
+                        <div class="users-table-row">
+                            <div><strong>Carlos López Pérez</strong></div>
+                            <div>carlos.lopez@dataintelligence.com</div>
+                            <div><span class="user-role-badge role-viewer">Visualizador</span></div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="action-button secondary" style="padding: 6px 12px; font-size: 11px;">Editar</button>
+                                <button class="action-button secondary" style="padding: 6px 12px; font-size: 11px;">Eliminar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CONFIGURACIÓN PAGE -->
+                <div class="page" id="settingsPage">
+                    <h1 class="page-title">Configuración</h1>
+
+                    <div class="settings-tabs">
+                        <button class="tab-button active" data-tab="account">Cuenta</button>
+                        <button class="tab-button" data-tab="sources">Fuentes</button>
+                        <button class="tab-button" data-tab="users">Usuarios</button>
+                        <button class="tab-button" data-tab="notifications">Notificaciones</button>
+                        <button class="tab-button" data-tab="plan">Plan</button>
+                    </div>
+
+                    <!-- ACCOUNT TAB -->
+                    <div class="tab-content active" id="accountTab">
+                        <div class="settings-form">
+                            <div class="form-input-group">
+                                <label class="form-label">Nombre de la Empresa</label>
+                                <input type="text" class="form-input" value="Dataintelligence.com" disabled>
+                            </div>
+                            <div class="form-input-group">
+                                <label class="form-label">Email de Contacto</label>
+                                <input type="email" class="form-input" value="admin@dataintelligence.com">
+                                <div class="form-input-text">Email principal para notificaciones</div>
+                            </div>
+                            <div class="form-input-group">
+                                <label class="form-label">Teléfono</label>
+                                <input type="tel" class="form-input" value="+54 11 2345-6789">
+                            </div>
+                            <div class="form-input-group">
+                                <label class="form-label">Nueva Contraseña</label>
+                                <input type="password" class="form-input" placeholder="••••••••">
+                                <div class="form-input-text">Dejar en blanco para no cambiar</div>
+                            </div>
+                            <button class="action-button" style="width: fit-content; padding: 12px 24px; margin-top: 16px;">Guardar cambios</button>
+                        </div>
+                    </div>
+
+                    <!-- SOURCES TAB -->
+                    <div class="tab-content" id="sourcesTab">
+                        <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 20px;">Fuentes de Datos Conectadas</h3>
+                        <div class="settings-grid">
+                            <div class="settings-card">
+                                <div class="settings-card-title">
+                                    📁 Google Drive
+                                    <span class="settings-card-status status-active">Activa</span>
+                                </div>
+                                <div class="settings-card-details">
+                                    <div>Cuenta: admin@dataintelligence.com</div>
+                                    <div>Carpeta: Facturas 2025</div>
+                                    <div>Última sincronización: Hoy 08:00</div>
+                                    <button class="action-button secondary" style="margin-top: 12px; width: 100%;">⚙ Reconfigurar</button>
+                                </div>
+                            </div>
+                            <div class="settings-card">
+                                <div class="settings-card-title">
+                                    🖥 Red Local
+                                    <span class="settings-card-status status-active">Activa</span>
+                                </div>
+                                <div class="settings-card-details">
+                                    <div>Servidor: 192.168.1.100</div>
+                                    <div>Ruta: /facturas/2025</div>
+                                    <div>Última sincronización: Hoy 08:30</div>
+                                    <button class="action-button secondary" style="margin-top: 12px; width: 100%;">⚙ Configurar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- USERS TAB -->
+                    <div class="tab-content" id="usersTab">
+                        <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 20px;">Usuarios del Sistema</h3>
+                        <div class="users-table">
+                            <div class="users-table-header">
+                                <div>Nombre</div>
+                                <div>Email</div>
+                                <div>Rol</div>
+                                <div>Acciones</div>
+                            </div>
+                            <div class="users-table-row">
+                                <div><strong>Guillermo Martínez</strong></div>
+                                <div>guillermo@dataintelligence.com</div>
+                                <div><span class="user-role-badge role-admin">Admin</span></div>
+                                <div style="display: flex; gap: 8px;">
+                                    <button class="action-button secondary" style="padding: 6px 12px; font-size: 11px;">Editar</button>
+                                </div>
+                            </div>
+                            <div class="users-table-row">
+                                <div><strong>Ana María García</strong></div>
+                                <div>ana.garcia@dataintelligence.com</div>
+                                <div><span class="user-role-badge role-operator">Operadora</span></div>
+                                <div style="display: flex; gap: 8px;">
+                                    <button class="action-button secondary" style="padding: 6px 12px; font-size: 11px;">Editar</button>
+                                    <button class="action-button secondary" style="padding: 6px 12px; font-size: 11px;">Eliminar</button>
+                                </div>
+                            </div>
+                            <div class="users-table-row">
+                                <div><strong>Carlos López Pérez</strong></div>
+                                <div>carlos.lopez@dataintelligence.com</div>
+                                <div><span class="user-role-badge role-viewer">Visualizador</span></div>
+                                <div style="display: flex; gap: 8px;">
+                                    <button class="action-button secondary" style="padding: 6px 12px; font-size: 11px;">Editar</button>
+                                    <button class="action-button secondary" style="padding: 6px 12px; font-size: 11px;">Eliminar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- NOTIFICATIONS TAB -->
+                    <div class="tab-content" id="notificationsTab">
+                        <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 20px;">Preferencias de Notificaciones</h3>
+                        <div class="settings-form" style="max-width: 100%;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px; background: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+                                <div>
+                                    <div style="font-weight: 600; margin-bottom: 4px;">Alertas de facturas por vencer</div>
+                                    <div style="font-size: 12px; color: rgba(255, 255, 255, 0.6);">Recibir notificaciones 5 días antes del vencimiento</div>
+                                </div>
+                                <div class="toggle-switch active" onclick="this.classList.toggle('active')">
+                                    <div class="toggle-knob"></div>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px; background: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+                                <div>
+                                    <div style="font-weight: 600; margin-bottom: 4px;">Alertas de facturas vencidas</div>
+                                    <div style="font-size: 12px; color: rgba(255, 255, 255, 0.6);">Notificaciones de facturas con pago vencido</div>
+                                </div>
+                                <div class="toggle-switch active" onclick="this.classList.toggle('active')">
+                                    <div class="toggle-knob"></div>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px; background: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+                                <div>
+                                    <div style="font-weight: 600; margin-bottom: 4px;">Resumen semanal</div>
+                                    <div style="font-size: 12px; color: rgba(255, 255, 255, 0.6);">Recibir resumen cada viernes</div>
+                                </div>
+                                <div class="toggle-switch active" onclick="this.classList.toggle('active')">
+                                    <div class="toggle-knob"></div>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px; background: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+                                <div>
+                                    <div style="font-weight: 600; margin-bottom: 4px;">Alertas de desvíos</div>
+                                    <div style="font-size: 12px; color: rgba(255, 255, 255, 0.6);">Notificaciones cuando se detecten desvíos</div>
+                                </div>
+                                <div class="toggle-switch active" onclick="this.classList.toggle('active')">
+                                    <div class="toggle-knob"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PLAN TAB -->
+                    <div class="tab-content" id="planTab">
+                        <div class="plan-card">
+                            <div class="plan-name">Professional</div>
+                            <div class="plan-status">Activo hasta 31/12/2025</div>
+                            <div class="plan-details">
+                                <div>📊 Hasta 1.000 facturas/mes</div>
+                                <div>👥 Hasta 5 usuarios</div>
+                                <div>🔄 Sincronización automática diaria</div>
+                                <div>🤖 Detección de desvíos con IA</div>
+                                <div>📧 Alertas por email</div>
+                                <div>💾 Backups automáticos</div>
+                            </div>
+
+                            <div class="usage-bar-container">
+                                <div class="usage-label">
+                                    <span>Uso de facturas</span>
+                                    <span>847/500 facturas</span>
+                                </div>
+                                <div class="usage-progress">
+                                    <div class="usage-fill"></div>
+                                </div>
+                                <div class="usage-text">Has excedido tu límite de facturas. Se recomienda actualizar a Enterprise.</div>
+                                <div class="recommend-badge">⚠ Upgrade recomendado</div>
+                            </div>
+
+                            <button class="action-button" style="width: 100%; padding: 12px; margin-top: 24px; font-size: 14px; font-weight: 700;">💳 Actualizar a Enterprise</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // PARTICLE CANVAS (LOGIN)
+        // ============================================
+        function initParticleCanvas() {
+            const canvas = document.getElementById('login-canvas');
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const particles = [];
+            const particleCount = 80;
+            const connectionDistance = 120;
+
+            class Particle {
+                constructor() {
+                    this.x = Math.random() * canvas.width;
+                    this.y = Math.random() * canvas.height;
+                    this.vx = (Math.random() - 0.5) * 0.5;
+                    this.vy = (Math.random() - 0.5) * 0.5;
+                    this.radius = Math.random() * 1.5 + 0.5;
+                }
+
+                update() {
+                    this.x += this.vx;
+                    this.y += this.vy;
+
+                    if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+                    if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+
+                    this.x = Math.max(0, Math.min(canvas.width, this.x));
+                    this.y = Math.max(0, Math.min(canvas.height, this.y));
+                }
+
+                draw() {
+                    ctx.fillStyle = 'rgba(0, 212, 170, 0.6)';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle());
+            }
+
+            function drawLines() {
+                for (let i = 0; i < particles.length; i++) {
+                    for (let j = i + 1; j < particles.length; j++) {
+                        const dx = particles[i].x - particles[j].x;
+                        const dy = particles[i].y - particles[j].y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        if (distance < connectionDistance) {
+                            ctx.strokeStyle = `rgba(0, 212, 170, ${0.15 * (1 - distance / connectionDistance)})`;
+                            ctx.lineWidth = 0.5;
+                            ctx.beginPath();
+                            ctx.moveTo(particles[i].x, particles[i].y);
+                            ctx.lineTo(particles[j].x, particles[j].y);
+                            ctx.stroke();
+                        }
+                    }
+                }
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                particles.forEach(p => {
+                    p.update();
+                    p.draw();
+                });
+
+                drawLines();
+                requestAnimationFrame(animate);
+            }
+
+            animate();
+
+            window.addEventListener('resize', () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            });
+        }
+
+        // ============================================
+        // LOGIN LOGIC
+        // ============================================
+        document.getElementById('passwordToggle').addEventListener('click', function() {
+            const passwordInput = document.getElementById('password');
+            const type = passwordInput.type === 'password' ? 'text' : 'password';
+            passwordInput.type = type;
+        });
+
+        document.getElementById('email').addEventListener('input', function() {
+            const email = this.value;
+            const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+            if (isValid) {
+                this.classList.add('valid');
+            } else {
+                this.classList.remove('valid');
+            }
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const button = document.querySelector('.login-button');
+
+            // Demo credentials
+            if (email === 'demo@dataintelligence.com' && password === 'AutoData2025') {
+                button.classList.add('loading');
+                button.innerHTML = '<span class="spinner"></span> Ingresando...';
+
+                setTimeout(() => {
+                    document.getElementById('loginScreen').classList.add('hidden');
+                    document.getElementById('appContainer').classList.add('visible');
+                    initCharts();
+                    initLucideIcons();
+                }, 800);
+            } else {
+                alert('Credenciales inválidas. Usa: demo@dataintelligence.com / AutoData2025');
+            }
+        });
+
+        // ============================================
+        // NAVIGATION
+        // ============================================
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+
+                const pageId = this.dataset.page + 'Page';
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                document.getElementById(pageId).classList.add('active');
+            });
+        });
+
+        // Settings tabs
+        document.querySelectorAll('.tab-button').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tab = this.dataset.tab;
+                document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                this.classList.add('active');
+                document.getElementById(tab + 'Tab').classList.add('active');
+            });
+        });
+
+        // ============================================
+        // LOGOUT
+        // ============================================
+        document.getElementById('logoutButton').addEventListener('click', function() {
+            document.getElementById('appContainer').classList.remove('visible');
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('loginForm').reset();
+            document.getElementById('email').classList.remove('valid');
+            document.querySelector('.login-button').classList.remove('loading');
+            document.querySelector('.login-button').innerHTML = 'Ingresar a AutoData';
+        });
+
+        // ============================================
+        // CHARTS (Chart.js)
+        // ============================================
+        let monthlyChart, categoryChart;
+
+        function initCharts() {
+            const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+            monthlyChart = new Chart(monthlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio'],
+                    datasets: [
+                        {
+                            label: 'Servicios',
+                            data: [45, 52, 38, 55, 60, 65],
+                            backgroundColor: '#0A1628',
+                            borderColor: '#00D4AA',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Materiales',
+                            data: [25, 28, 20, 30, 35, 35],
+                            backgroundColor: '#00D4AA',
+                            borderColor: '#00B894',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'RRHH',
+                            data: [12, 11, 10, 10, 8, 12],
+                            backgroundColor: '#C9A84C',
+                            borderColor: '#D4AF7A',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: 'rgba(255, 255, 255, 0.7)',
+                                font: { size: 12, weight: '600', family: "'Inter', sans-serif" }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            stacked: true,
+                            ticks: { color: 'rgba(255, 255, 255, 0.5)', font: { size: 11 } },
+                            grid: { color: 'rgba(0, 212, 170, 0.1)' }
+                        },
+                        x: {
+                            stacked: true,
+                            ticks: { color: 'rgba(255, 255, 255, 0.5)', font: { size: 11 } },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+
+            const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+            categoryChart = new Chart(categoryCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Servicios', 'Materiales', 'RRHH', 'Otros'],
+                    datasets: [{
+                        data: [42, 31, 18, 9],
+                        backgroundColor: ['#00D4AA', '#52C41A', '#C9A84C', '#FF8C00'],
+                        borderColor: '#0A1628',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: 'rgba(255, 255, 255, 0.7)',
+                                font: { size: 12, weight: '600', family: "'Inter', sans-serif" }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ============================================
+        // AUTOMATION EXECUTION
+        // ============================================
+        document.querySelectorAll('.execute-button').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const automation = this.dataset.automation;
+                const card = this.closest('.automation-card');
+                const progressBar = card.querySelector('.progress-bar');
+                const progressFill = card.querySelector('.progress-fill');
+                const progressStage = card.querySelector('.progress-stage');
+                const stages = ['Conectando...', 'Analizando...', 'Extrayendo...', 'Verificando...', 'Actualizando...', '✓ Listo'];
+                let stageIndex = 0;
+
+                this.disabled = true;
+                this.style.opacity = '0.5';
+                progressBar.classList.add('active');
+                progressStage.classList.add('active');
+
+                const stageInterval = setInterval(() => {
+                    if (stageIndex < stages.length) {
+                        progressStage.textContent = stages[stageIndex];
+                        stageIndex++;
+                    }
+                }, 500);
+
+                setTimeout(() => {
+                    clearInterval(stageInterval);
+                    progressBar.classList.remove('active');
+                    progressStage.classList.add('active');
+                    progressStage.textContent = '✓ 8 facturas nuevas. 1 desvío detectado.';
+                    this.disabled = false;
+                    this.style.opacity = '1';
+
+                    setTimeout(() => {
+                        progressStage.classList.remove('active');
+                    }, 3000);
+                }, 3500);
+            });
+        });
+
+        // ============================================
+        // SYNC BUTTON
+        // ============================================
+        document.getElementById('syncButton').addEventListener('click', function() {
+            this.disabled = true;
+            const originalText = this.innerHTML;
+            this.innerHTML = '<span class="spinner"></span> Sincronizando...';
+
+            setTimeout(() => {
+                this.disabled = false;
+                this.innerHTML = originalText;
+                alert('✓ Sincronización completada: 12 facturas nuevas procesadas.');
+            }, 2000);
+        });
+
+        // ============================================
+        // LUCIDE ICONS
+        // ============================================
+        function initLucideIcons() {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            initParticleCanvas();
+        });
+
+        // Prevent right-click on login screen
+        document.addEventListener('contextmenu', (e) => {
+            if (!document.getElementById('appContainer').classList.contains('visible')) {
+                e.preventDefault();
+            }
+        });
+    </script>
+</body>
+</html>
