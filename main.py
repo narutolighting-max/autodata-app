@@ -728,9 +728,21 @@ def get_or_create_excel():
         return None
     if os.path.exists(EXCEL_FILE):
         try:
-            return load_workbook(EXCEL_FILE)
+            wb = load_workbook(EXCEL_FILE)
+            ws = wb.active
+            # Verificar si es formato nuevo (headers en fila 4) o viejo
+            if ws.cell(row=4, column=1).value == 'Tipo Comp.' and ws.max_column >= 21:
+                return wb
+            # Formato viejo detectado — recrear
+            print("Excel con formato viejo detectado, recreando...")
+            wb.close()
+            os.remove(EXCEL_FILE)
         except Exception as e:
             print(f"Error cargando Excel: {e}")
+            try:
+                os.remove(EXCEL_FILE)
+            except Exception:
+                pass
 
     wb = Workbook()
     ws = wb.active
@@ -836,6 +848,28 @@ def get_existing_otros(ws):
     return existing
 
 
+def format_cuit(raw):
+    """Convierte CUIT sin guiones (20258386826) a formato XX-XXXXXXXX-X."""
+    raw = raw.strip()
+    if '-' in raw:
+        return raw
+    if len(raw) == 11:
+        return f"{raw[:2]}-{raw[2:10]}-{raw[10]}"
+    return raw
+
+
+def clean_field(value, stop_words=None):
+    """Limpia un campo eliminando texto extra despues de ciertos keywords."""
+    if not value:
+        return ""
+    if stop_words:
+        for sw in stop_words:
+            idx = value.lower().find(sw.lower())
+            if idx > 0:
+                value = value[:idx]
+    return value.strip()
+
+
 def extract_invoice_data(pdf_path):
     if not PDF_SUPPORT:
         return None
@@ -848,16 +882,17 @@ def extract_invoice_data(pdf_path):
             if not text:
                 return None
 
-            # Tipo comprobante (Factura A/B/C, Nota de Credito, Recibo)
-            tipo_match = re.search(r'(FACTURA|Factura|RECIBO|NOTA DE CR[ÉE]DITO|NOTA DE D[ÉE]BITO)\s*([ABC])?', text, re.IGNORECASE)
+            # Tipo comprobante: buscar "FACTURA" y la letra en linea separada
+            tipo_match = re.search(r'(FACTURA|RECIBO|NOTA DE CR[ÉE]DITO|NOTA DE D[ÉE]BITO)', text, re.IGNORECASE)
+            letra_match = re.search(r'^([ABC])\s*$', text, re.MULTILINE)
             if tipo_match:
                 tipo_name = tipo_match.group(1).strip().title()
-                tipo_letra = tipo_match.group(2).upper() if tipo_match.group(2) else ""
+                tipo_letra = letra_match.group(1) if letra_match else ""
                 data['tipo'] = f"{tipo_name} {tipo_letra}".strip()
             else:
                 data['tipo'] = ""
 
-            # Punto de venta y Nro comprobante (separados)
+            # Punto de venta y Nro comprobante
             pv_match = re.search(r'Punto de Venta:\s*(\d+)\s*Comp\.?\s*Nro:?\s*(\d+)', text, re.IGNORECASE)
             if pv_match:
                 data['punto_vta'] = pv_match.group(1).zfill(5)
@@ -868,51 +903,87 @@ def extract_invoice_data(pdf_path):
                 data['punto_vta'] = ""
 
             # Fecha emision
-            fecha_em = re.search(r'(?:Fecha\s*de\s*Emisi[óo]n|Fecha\s*Emisi[óo]n)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
+            fecha_em = re.search(r'Fecha\s*de\s*Emisi[óo]n[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
             if not fecha_em:
                 fecha_em = re.search(r'Fecha[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
             data['fecha'] = fecha_em.group(1) if fecha_em else ""
 
-            # CUITs (XX-XXXXXXXX-X)
-            cuit_all = re.findall(r'(\d{2}-\d{8}-\d)', text)
-            data['cuit_emisor'] = cuit_all[0] if len(cuit_all) > 0 else ""
-            data['cuit_cliente'] = cuit_all[1] if len(cuit_all) > 1 else ""
+            # CUITs — soporta con y sin guiones
+            cuit_all = re.findall(r'CUIT[:\s]*(\d{11}|\d{2}-\d{8}-\d)', text)
+            data['cuit_emisor'] = format_cuit(cuit_all[0]) if len(cuit_all) > 0 else ""
+            data['cuit_cliente'] = format_cuit(cuit_all[1]) if len(cuit_all) > 1 else ""
 
-            # Razones sociales
-            razones = re.findall(r'(?:Raz[óo]n Social|Apellido y Nombre|Denominaci[óo]n)[:\s]*([^\n]+)', text, re.IGNORECASE)
-            data['razon_social_emisor'] = razones[0].strip()[:80] if len(razones) > 0 else ""
-            data['razon_social_cliente'] = razones[1].strip()[:80] if len(razones) > 1 else ""
+            # Razones sociales (limpiar texto extra)
+            razones = re.findall(r'(?:Raz[óo]n\s*Social|Apellido\s*y\s*Nombre\s*/?\s*Raz[óo]n\s*Social)[:\s]*([^\n]+)', text, re.IGNORECASE)
+            data['razon_social_emisor'] = clean_field(
+                razones[0] if len(razones) > 0 else "",
+                ['Fecha de', 'CUIT', 'Domicilio']
+            )[:80]
+            data['razon_social_cliente'] = clean_field(
+                razones[1] if len(razones) > 1 else "",
+                ['Fecha de', 'CUIT', 'Domicilio']
+            )[:80]
 
-            # Domicilios
-            domicilios = re.findall(r'(?:Domicilio\s*(?:Comercial)?|Direcci[óo]n)[:\s]*([^\n]+)', text, re.IGNORECASE)
-            data['domicilio_emisor'] = domicilios[0].strip()[:100] if len(domicilios) > 0 else ""
-            data['domicilio_cliente'] = domicilios[1].strip()[:100] if len(domicilios) > 1 else ""
+            # Domicilios (limpiar texto extra)
+            domicilios = re.findall(r'Domicilio\s*(?:Comercial)?[:\s]*([^\n]+)', text, re.IGNORECASE)
+            data['domicilio_emisor'] = clean_field(
+                domicilios[0] if len(domicilios) > 0 else "",
+                ['CUIT', 'Ingresos', 'Condición']
+            )[:100]
+            # Segundo domicilio puede venir inline despues de Condicion IVA del cliente
+            if len(domicilios) > 1:
+                data['domicilio_cliente'] = clean_field(domicilios[1], ['CUIT', 'Ingresos'])[:100]
+            else:
+                dom2 = re.search(r'Domicilio[:\s]*([^\n]+)', text[text.find('Apellido'):] if 'Apellido' in text else '', re.IGNORECASE)
+                data['domicilio_cliente'] = dom2.group(1).strip()[:100] if dom2 else ""
 
-            # Condicion IVA
-            iva_all = re.findall(r'(?:Condici[óo]n\s*(?:frente al\s*)?IVA|Cond\.?\s*IVA)[:\s]*([^\n]+)', text, re.IGNORECASE)
-            data['cond_iva_emisor'] = iva_all[0].strip()[:40] if len(iva_all) > 0 else ""
-            data['cond_iva_cliente'] = iva_all[1].strip()[:40] if len(iva_all) > 1 else ""
+            # Condicion IVA (limpiar texto extra)
+            iva_all = re.findall(r'Condici[óo]n\s*frente\s*al\s*IVA[:\s]*([^\n]+)', text, re.IGNORECASE)
+            data['cond_iva_emisor'] = clean_field(
+                iva_all[0] if len(iva_all) > 0 else "",
+                ['Fecha de', 'Domicilio', 'Inicio']
+            )[:40]
+            data['cond_iva_cliente'] = clean_field(
+                iva_all[1] if len(iva_all) > 1 else "",
+                ['Fecha de', 'Domicilio', 'Inicio']
+            )[:40]
+            for key in ['cond_iva_emisor', 'cond_iva_cliente']:
+                v = data[key].lower()
+                if 'monotributo' in v:
+                    data[key] = 'Resp. Monotributo'
+                elif 'responsable inscripto' in v:
+                    data[key] = 'IVA Resp. Inscripto'
+                elif 'exento' in v:
+                    data[key] = 'IVA Exento'
 
             # Condicion de venta
-            cond_vta = re.search(r'(?:Condici[óo]n\s*de\s*Venta|Cond\.?\s*Venta)[:\s]*([^\n]+)', text, re.IGNORECASE)
+            cond_vta = re.search(r'Condici[óo]n\s*de\s*venta[:\s]*([^\n]+)', text, re.IGNORECASE)
             data['cond_venta'] = cond_vta.group(1).strip()[:30] if cond_vta else ""
 
             # Periodos
-            per_desde = re.search(r'(?:Per[íi]odo\s*(?:Facturado\s*)?Desde|Desde)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
-            per_hasta = re.search(r'(?:Per[íi]odo\s*(?:Facturado\s*)?Hasta|Hasta)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
+            per_desde = re.search(r'(?:Per[íi]odo\s*Facturado\s*)?Desde[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
+            per_hasta = re.search(r'Hasta[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
             data['per_desde'] = per_desde.group(1) if per_desde else ""
             data['per_hasta'] = per_hasta.group(1) if per_hasta else ""
 
             # Vto pago
-            vto_pago = re.search(r'(?:Vto\.?\s*(?:de\s*)?Pago|Vencimiento\s*(?:del\s*)?Pago|Fecha\s*Vto\.?\s*Pago)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
+            vto_pago = re.search(r'(?:Fecha\s*de\s*)?Vto\.?\s*(?:para\s*el\s*)?(?:pago|Pago)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
             data['vto_pago'] = vto_pago.group(1) if vto_pago else ""
 
-            # Producto/Servicio
-            prod_match = re.search(r'(?:Descripci[óo]n|Concepto|Servicio|Producto)[:\s]*([^\n]+)', text, re.IGNORECASE)
-            data['producto'] = prod_match.group(1).strip()[:100] if prod_match else ""
+            # Producto/Servicio — buscar en tabla de items
+            lines = text.split('\n')
+            data['producto'] = ""
+            for i, line in enumerate(lines):
+                if 'Producto / Servicio' in line or 'Producto/Servicio' in line:
+                    if i + 1 < len(lines):
+                        next_line = lines[i + 1].strip()
+                        item = re.match(r'\d+\s+(.+?)\s+\d+[.,]', next_line)
+                        if item:
+                            data['producto'] = item.group(1).strip()[:100]
+                    break
 
             # Importe total
-            imp_match = re.search(r'(?:Importe\s*Total|Total)[:\s$]*\$?\s*([\d.,]+)', text, re.IGNORECASE)
+            imp_match = re.search(r'Importe\s*Total[:\s$]*\$?\s*([\d.,]+)', text, re.IGNORECASE)
             if imp_match:
                 monto_str = imp_match.group(1).replace('.', '').replace(',', '.')
                 try:
@@ -923,11 +994,11 @@ def extract_invoice_data(pdf_path):
                 data['importe'] = 0.0
 
             # CAE
-            cae_match = re.search(r'CAE[:\s]*(\d{10,14})', text, re.IGNORECASE)
+            cae_match = re.search(r'CAE\s*N?[°º]?\s*:?\s*(\d{10,14})', text, re.IGNORECASE)
             data['cae'] = cae_match.group(1) if cae_match else ""
 
             # Vto CAE
-            vto_cae = re.search(r'(?:Vto\.?\s*(?:de\s*)?CAE|Fecha\s*Vto\.?\s*CAE)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
+            vto_cae = re.search(r'(?:Fecha\s*de\s*)?Vto\.?\s*(?:de\s*)?CAE[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text, re.IGNORECASE)
             data['vto_cae'] = vto_cae.group(1) if vto_cae else ""
 
             return data
