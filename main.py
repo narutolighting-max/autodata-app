@@ -10,10 +10,27 @@ import json
 import hashlib
 import secrets
 import time
+import glob
+import re
+from pathlib import Path
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import Flask, jsonify, request, send_from_directory, make_response
 from flask_cors import CORS
+
+# Intentar importar librerías de procesamiento de facturas
+try:
+    import pdfplumber
+    PDF_SUPPORT = True
+except ImportError:
+    PDF_SUPPORT = False
+
+try:
+    from openpyxl import Workbook, load_workbook
+    from openpyxl.styles import PatternFill
+    EXCEL_SUPPORT = True
+except ImportError:
+    EXCEL_SUPPORT = False
 
 # ═══════════════════════════════════════════════
 # CONFIGURACIÓN
@@ -663,12 +680,105 @@ def server_error(e):
 # PROCESAR FACTURAS PDF
 # ═══════════════════════════════════════════════
 
+def extract_invoice_data(pdf_path):
+    """Extrae datos de factura PDF usando pdfplumber. Retorna dict con datos o None si no es factura válida."""
+    if not PDF_SUPPORT:
+        return None
+
+    try:
+        data = {}
+        with pdfplumber.open(pdf_path) as pdf:
+            if len(pdf.pages) == 0:
+                return None
+
+            # Procesar primera página
+            page = pdf.pages[0]
+            text = page.extract_text()
+            if not text:
+                return None
+
+            # Buscar campos AFIP típicos
+            # CUIT (formato: XX-XXXXXXXX-X)
+            cuit_match = re.search(r'(\d{2})-(\d{8})-(\d)', text)
+            data['cuit'] = f"{cuit_match.group(1)}-{cuit_match.group(2)}-{cuit_match.group(3)}" if cuit_match else ""
+
+            # Número de comprobante (buscar patrones como "N°" o "Nro" seguido de números)
+            nro_match = re.search(r'(?:N°|Nro\.?|Número)\s*[:=]?\s*(\d+)', text, re.IGNORECASE)
+            data['numero_comprobante'] = nro_match.group(1) if nro_match else ""
+
+            # Fecha (buscar patrones de fecha DD/MM/YYYY o similar)
+            fecha_match = re.search(r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})', text)
+            if fecha_match:
+                data['fecha'] = f"{fecha_match.group(3)}-{fecha_match.group(2)}-{fecha_match.group(1)}"
+            else:
+                data['fecha'] = datetime.now().strftime("%Y-%m-%d")
+
+            # Razón social (buscar después de palabras clave)
+            razon_match = re.search(r'(?:Razón Social|Empresa|Proveedor)[:=]?\s*([^\n]+)', text, re.IGNORECASE)
+            data['razon_social'] = razon_match.group(1).strip() if razon_match else ""
+
+            # Importe total (buscar "TOTAL" o "Total a pagar")
+            importe_match = re.search(r'(?:Total|TOTAL|Importe Total)[:\s]*[\$]?\s*([\d.,]+)', text, re.IGNORECASE)
+            if importe_match:
+                monto_str = importe_match.group(1).replace('.', '').replace(',', '.')
+                try:
+                    data['importe'] = float(monto_str)
+                except:
+                    data['importe'] = 0.0
+            else:
+                data['importe'] = 0.0
+
+            # CAE (Código de Autorización Electrónica)
+            cae_match = re.search(r'CAE[:\s]*(\d{11})', text, re.IGNORECASE)
+            data['cae'] = cae_match.group(1) if cae_match else ""
+
+            # Tipo de comprobante
+            tipo_match = re.search(r'(?:Factura|Recibo|Nota)[:\s]([ABC])?', text, re.IGNORECASE)
+            data['tipo_comprobante'] = tipo_match.group(1) if tipo_match and tipo_match.group(1) else "C"
+
+            # Validar que es una factura AFIP válida (debe tener CAE o CUIT)
+            if not data.get('cae') and not data.get('cuit'):
+                return None
+
+            return data
+    except Exception as e:
+        print(f"Error extrayendo datos de {pdf_path}: {str(e)}")
+        return None
+
+
+def create_or_load_excel(excel_path):
+    """Crea o carga un archivo Excel con repositorio de facturas."""
+    if not EXCEL_SUPPORT:
+        return None
+
+    headers = ['Tipo Comp.', 'Nro. Comp.', 'Fecha', 'CUIT Emisor', 'Razón Social',
+               'Importe Total ($)', 'CAE N°', 'Archivo PDF']
+
+    if os.path.exists(excel_path):
+        try:
+            return load_workbook(excel_path)
+        except:
+            pass
+
+    # Crear nuevo
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Repositorio Facturas"
+
+    # Agregar headers
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.value = header
+        cell.fill = PatternFill(start_color="00D4AA", end_color="00D4AA", fill_type="solid")
+        cell.font = cell.font.copy()
+        cell.font = cell.font.copy()
+
+    return wb
+
+
 @app.route("/ad-api/invoices/process", methods=["POST"])
 def process_invoices():
     """Procesa facturas PDF desde una carpeta y las agrega a un repositorio Excel"""
-    import glob
-    from pathlib import Path
-
     try:
         data = request.get_json() or {}
         source_path = data.get("source_path", "").strip()
@@ -706,27 +816,82 @@ def process_invoices():
                 "mensaje": "No se encontraron archivos PDF en la carpeta"
             }), 200
 
-        # Por ahora, devolvemos un resumen simulado
-        # En una versión real, aquí iría la lógica de pdfplumber para extraer datos
-        documents = []
-        for idx, pdf_file in enumerate(pdf_files[:5], 1):  # Máximo 5 para demo
-            documents.append({
-                "nombre": os.path.basename(pdf_file),
-                "estado": "procesado",
-                "numero_comprobante": f"00000{idx:03d}",
-                "fecha": datetime.now().isoformat()
-            })
-
         excel_path = os.path.join(dest_path, "repositorio_facturas.xlsx")
+
+        # Cargar o crear repositorio Excel
+        wb = create_or_load_excel(excel_path) if EXCEL_SUPPORT else None
+        ws = wb.active if wb else None
+
+        # Leer facturas ya cargadas para evitar duplicados
+        existing_invoices = set()
+        if ws:
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                if row[1]:  # Columna "Nro. Comp."
+                    existing_invoices.add(str(row[1]))
+
+        documents = []
+        new_count = 0
+        skipped_count = 0
+        other_docs_count = 0
+
+        # Procesar cada PDF
+        for pdf_file in pdf_files:
+            filename = os.path.basename(pdf_file)
+
+            # Intentar extraer datos de factura
+            invoice_data = extract_invoice_data(pdf_file) if PDF_SUPPORT else None
+
+            if invoice_data:
+                nro_comp = invoice_data.get('numero_comprobante', '')
+
+                # Verificar si ya existe
+                if nro_comp in existing_invoices:
+                    documents.append({
+                        "nombre": filename,
+                        "estado": "duplicado",
+                        "numero_comprobante": nro_comp
+                    })
+                    skipped_count += 1
+                else:
+                    # Agregar al Excel
+                    if ws:
+                        row_num = ws.max_row + 1
+                        ws.cell(row=row_num, column=1).value = invoice_data.get('tipo_comprobante', 'C')
+                        ws.cell(row=row_num, column=2).value = nro_comp
+                        ws.cell(row=row_num, column=3).value = invoice_data.get('fecha', '')
+                        ws.cell(row=row_num, column=4).value = invoice_data.get('cuit', '')
+                        ws.cell(row=row_num, column=5).value = invoice_data.get('razon_social', '')
+                        ws.cell(row=row_num, column=6).value = invoice_data.get('importe', 0)
+                        ws.cell(row=row_num, column=7).value = invoice_data.get('cae', '')
+                        ws.cell(row=row_num, column=8).value = filename
+
+                    documents.append({
+                        "nombre": filename,
+                        "estado": "procesado",
+                        "numero_comprobante": nro_comp
+                    })
+                    new_count += 1
+                    existing_invoices.add(nro_comp)
+            else:
+                # No es factura válida — registrar como otro documento
+                documents.append({
+                    "nombre": filename,
+                    "estado": "no_factura"
+                })
+                other_docs_count += 1
+
+        # Guardar Excel
+        if wb:
+            wb.save(excel_path)
 
         return jsonify({
             "error": False,
-            "new_invoices": len(documents),
-            "skipped": len(pdf_files) - len(documents),
-            "other_docs": 0,
+            "new_invoices": new_count,
+            "skipped": skipped_count,
+            "other_docs": other_docs_count,
             "documents": documents,
             "excel_path": excel_path,
-            "mensaje": f"✅ Se procesaron {len(documents)} facturas exitosamente"
+            "mensaje": f"✅ Se procesaron {new_count} facturas nuevas. {skipped_count} duplicadas. {other_docs_count} archivos ignorados."
         }), 200
 
     except Exception as e:
