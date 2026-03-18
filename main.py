@@ -779,6 +779,20 @@ def create_or_load_excel(excel_path):
 @app.route("/ad-api/invoices/process", methods=["POST"])
 def process_invoices():
     """Procesa facturas PDF desde una carpeta y las agrega a un repositorio Excel"""
+    # Verificar disponibilidad de librerías requeridas
+    if not PDF_SUPPORT or not EXCEL_SUPPORT:
+        missing = []
+        if not PDF_SUPPORT:
+            missing.append("pdfplumber")
+        if not EXCEL_SUPPORT:
+            missing.append("openpyxl")
+        return jsonify({
+            "error": True,
+            "mensaje": f"⚠️ Librerías no instaladas: {', '.join(missing)}. Contacta a soporte.",
+            "documents": [],
+            "new_invoices": 0
+        }), 503
+
     try:
         data = request.get_json() or {}
         source_path = data.get("source_path", "").strip()
