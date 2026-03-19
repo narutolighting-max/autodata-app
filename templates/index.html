@@ -3,469 +3,690 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AutoData — Procesador de Facturas</title>
+    <title>AutoData — Gestión de Facturas</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
     <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-light: #dbeafe;
+            --success: #16a34a;
+            --success-light: #dcfce7;
+            --warning: #d97706;
+            --warning-light: #fef3c7;
+            --danger: #dc2626;
+            --danger-light: #fee2e2;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+            --radius: 10px;
+            --shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -2px rgba(0,0,0,.05);
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #0A1628 0%, #1a2a3f 100%);
-            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-800);
             min-height: 100vh;
         }
 
-        .app-container { display: flex; height: 100vh; }
-
-        /* SIDEBAR */
-        .sidebar {
-            width: 250px;
-            background: rgba(10, 22, 40, 0.95);
-            border-right: 1px solid rgba(0, 212, 170, 0.2);
+        /* ─── HEADER ─── */
+        .header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 16px 24px;
             display: flex;
-            flex-direction: column;
-            padding: 20px 0;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow-lg);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header h1 { font-size: 1.25rem; font-weight: 700; }
+        .header .version { font-size: .7rem; opacity: .7; }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        .user-info { text-align: right; font-size: .85rem; line-height: 1.3; }
+        .user-info .name { font-weight: 600; }
+        .user-info .empresa { opacity: .8; font-size: .75rem; }
+        .btn-logout {
+            background: rgba(255,255,255,.15);
+            border: 1px solid rgba(255,255,255,.3);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: .8rem;
+            transition: background .2s;
+        }
+        .btn-logout:hover { background: rgba(255,255,255,.25); }
+
+        /* ─── TABS ─── */
+        .tabs {
+            display: flex;
+            background: white;
+            border-bottom: 1px solid var(--gray-200);
+            padding: 0 24px;
+            overflow-x: auto;
+        }
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            font-size: .9rem;
+            color: var(--gray-500);
+            white-space: nowrap;
+            transition: all .2s;
+        }
+        .tab:hover { color: var(--primary); }
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            font-weight: 600;
         }
 
-        .sidebar-header {
-            padding: 0 20px 30px;
-            border-bottom: 1px solid rgba(0, 212, 170, 0.15);
+        /* ─── MAIN CONTAINER ─── */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .section { display: none; }
+        .section.active { display: block; }
+
+        /* ─── CARDS ─── */
+        .card {
+            background: white;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 24px;
             margin-bottom: 20px;
         }
-
-        .logo { font-size: 18px; font-weight: 700; color: #00D4AA; }
-        .logo-subtext { font-size: 11px; color: rgba(0, 212, 170, 0.6); margin-top: 4px; }
-
-        .nav-menu { list-style: none; }
-
-        .nav-item {
-            padding: 12px 20px; margin: 4px 10px; border-radius: 6px;
-            cursor: pointer; transition: all 0.2s; font-size: 14px;
-            color: rgba(224, 224, 224, 0.7); display: flex;
-            align-items: center; gap: 10px; border-left: 3px solid transparent;
+        .card h2 {
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .nav-item:hover { background: rgba(0, 212, 170, 0.1); color: #00D4AA; }
-        .nav-item.active {
-            background: rgba(0, 212, 170, 0.15); color: #00D4AA;
-            border-left-color: #00D4AA; font-weight: 600;
-        }
-        .nav-item.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
-
-        /* MAIN */
-        .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-
-        .header {
-            padding: 20px 30px;
-            border-bottom: 1px solid rgba(0, 212, 170, 0.1);
-            background: rgba(10, 22, 40, 0.5);
-        }
-        .header h1 { font-size: 24px; color: #fff; font-weight: 600; }
-
-        .content { flex: 1; overflow-y: auto; padding: 30px; }
-        .page { display: none; }
-        .page.active { display: block; }
-
-        /* UPLOAD ZONE */
+        /* ─── UPLOAD ZONE ─── */
         .upload-zone {
-            background: rgba(20, 40, 60, 0.6);
-            border: 2px dashed rgba(0, 212, 170, 0.4);
-            border-radius: 12px;
-            padding: 50px 30px;
+            border: 2px dashed var(--gray-300);
+            border-radius: var(--radius);
+            padding: 48px 24px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s;
-            margin-bottom: 25px;
+            transition: all .3s;
+            background: var(--gray-50);
         }
-
         .upload-zone:hover, .upload-zone.dragover {
-            border-color: #00D4AA;
-            background: rgba(0, 212, 170, 0.08);
-            transform: translateY(-2px);
+            border-color: var(--primary);
+            background: var(--primary-light);
         }
-
-        .upload-zone .icon { font-size: 48px; margin-bottom: 15px; }
-        .upload-zone h3 { color: #00D4AA; font-size: 18px; margin-bottom: 8px; }
-        .upload-zone p { color: rgba(224, 224, 224, 0.5); font-size: 13px; }
-
+        .upload-zone .icon { font-size: 3rem; margin-bottom: 12px; }
+        .upload-zone p { color: var(--gray-500); margin-bottom: 4px; }
+        .upload-zone .hint { font-size: .8rem; color: var(--gray-400); }
         .upload-zone input[type="file"] { display: none; }
 
-        /* FILE LIST */
         .file-list {
-            background: rgba(20, 40, 60, 0.6);
-            border: 1px solid rgba(0, 212, 170, 0.2);
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 25px;
-            display: none;
+            margin-top: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
         }
-
-        .file-list.active { display: block; }
-
-        .file-list-title {
-            font-size: 14px; font-weight: 700; color: #00D4AA;
-            margin-bottom: 12px;
-        }
-
-        .file-item {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 8px 12px; border-radius: 6px;
-            background: rgba(10, 22, 40, 0.5);
-            margin-bottom: 6px; font-size: 13px;
-        }
-
-        .file-item .name { color: #e0e0e0; }
-        .file-item .size { color: rgba(224, 224, 224, 0.5); font-size: 11px; }
-        .file-item .remove {
-            color: #ff6464; cursor: pointer; font-size: 16px;
-            background: none; border: none; padding: 0 4px;
-        }
-
-        /* ACTION BUTTONS */
-        .action-row {
-            display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap;
+        .file-tag {
+            background: var(--primary-light);
+            color: var(--primary);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: .8rem;
+            display: flex;
             align-items: center;
+            gap: 6px;
+        }
+        .file-tag .remove {
+            cursor: pointer;
+            opacity: .6;
+            font-weight: bold;
+        }
+        .file-tag .remove:hover { opacity: 1; }
+
+        /* ─── BUTTONS ─── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 24px;
+            border-radius: 8px;
+            border: none;
+            font-size: .9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .2s;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-primary:disabled {
+            background: var(--gray-300);
+            cursor: not-allowed;
+        }
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+        .btn-success:hover { background: #15803d; }
+        .btn-outline {
+            background: white;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+        .btn-outline:hover { background: var(--primary-light); }
+        .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+
+        /* ─── PROGRESS BAR ─── */
+        .progress-container {
+            display: none;
+            margin-top: 20px;
+        }
+        .progress-container.visible { display: block; }
+        .progress-bar-outer {
+            background: var(--gray-200);
+            border-radius: 20px;
+            height: 24px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-bar-inner {
+            background: linear-gradient(90deg, var(--primary), #60a5fa);
+            height: 100%;
+            border-radius: 20px;
+            transition: width .4s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: .75rem;
+            font-weight: 600;
+            min-width: 40px;
+        }
+        .progress-status {
+            margin-top: 8px;
+            font-size: .85rem;
+            color: var(--gray-600);
         }
 
-        .process-btn {
-            background: linear-gradient(135deg, #00D4AA 0%, #00b894 100%);
-            border: none; color: #0A1628; padding: 14px 35px;
-            border-radius: 8px; cursor: pointer; font-size: 15px;
-            font-weight: 700; transition: all 0.3s;
+        /* ─── RESULTS ─── */
+        .results { display: none; margin-top: 20px; }
+        .results.visible { display: block; }
+        .result-summary {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
         }
-        .process-btn:hover:not(:disabled) {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(0, 212, 170, 0.4);
+        .stat-card {
+            flex: 1;
+            min-width: 120px;
+            padding: 16px;
+            border-radius: var(--radius);
+            text-align: center;
         }
-        .process-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .stat-card .number { font-size: 1.8rem; font-weight: 700; }
+        .stat-card .label { font-size: .75rem; margin-top: 4px; }
+        .stat-new { background: var(--success-light); color: var(--success); }
+        .stat-skip { background: var(--warning-light); color: var(--warning); }
+        .stat-other { background: var(--danger-light); color: var(--danger); }
 
-        .clear-btn {
-            background: rgba(255, 100, 100, 0.15);
-            border: 1px solid rgba(255, 100, 100, 0.3);
-            color: #ff6464; padding: 12px 20px; border-radius: 6px;
-            cursor: pointer; font-size: 13px; font-weight: 600;
+        .doc-list { list-style: none; }
+        .doc-item {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--gray-100);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: .85rem;
         }
+        .doc-item:last-child { border-bottom: none; }
+        .badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: .7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .badge-ok { background: var(--success-light); color: var(--success); }
+        .badge-skip { background: var(--warning-light); color: var(--warning); }
+        .badge-err { background: var(--danger-light); color: var(--danger); }
 
-        .download-btn {
-            background: rgba(201, 168, 76, 0.2);
-            border: 1px solid rgba(201, 168, 76, 0.4);
-            color: #C9A84C; padding: 12px 20px; border-radius: 6px;
-            cursor: pointer; font-size: 13px; font-weight: 600;
+        /* ─── TABLE (Preview) ─── */
+        .table-wrap { overflow-x: auto; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: .82rem;
+        }
+        th, td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--gray-200);
+        }
+        th {
+            background: var(--gray-100);
+            font-weight: 600;
+            color: var(--gray-700);
+            position: sticky;
+            top: 0;
+        }
+        tr:hover td { background: var(--gray-50); }
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+            color: var(--gray-400);
+        }
+        .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+
+        /* ─── HISTORY ─── */
+        .history-item {
+            padding: 14px;
+            border-bottom: 1px solid var(--gray-100);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .history-item:last-child { border-bottom: none; }
+        .history-date {
+            font-size: .8rem;
+            color: var(--gray-500);
+        }
+        .history-stats {
+            display: flex;
+            gap: 12px;
+            font-size: .8rem;
+        }
+        .history-stats span { padding: 2px 8px; border-radius: 4px; }
+
+        /* ─── LOGIN ─── */
+        .login-backdrop {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .login-card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px 36px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 25px 50px rgba(0,0,0,.25);
+        }
+        .login-card h1 {
+            text-align: center;
+            font-size: 1.5rem;
+            margin-bottom: 4px;
+        }
+        .login-card .subtitle {
+            text-align: center;
+            color: var(--gray-500);
+            font-size: .85rem;
+            margin-bottom: 28px;
+        }
+        .form-group { margin-bottom: 16px; }
+        .form-group label {
+            display: block;
+            font-size: .85rem;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: var(--gray-700);
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: .9rem;
+            outline: none;
+            transition: border-color .2s;
+        }
+        .form-group input:focus { border-color: var(--primary); }
+        .login-error {
+            background: var(--danger-light);
+            color: var(--danger);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: .8rem;
+            margin-bottom: 12px;
             display: none;
         }
-        .download-btn.active { display: inline-flex; align-items: center; gap: 6px; }
-
-        /* STATUS */
-        .status-panel {
-            background: rgba(20, 40, 60, 0.6);
-            border: 1px solid rgba(0, 212, 170, 0.2);
-            border-radius: 10px; padding: 20px;
-            margin-bottom: 25px; display: none;
+        .btn-login {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background .2s;
         }
-        .status-panel.active { display: block; }
-        .status-message { font-size: 14px; line-height: 1.7; }
-        .status-message.success { color: #00D4AA; }
-        .status-message.error { color: #ff6464; }
-        .status-message.info { color: rgba(0, 212, 170, 0.8); }
-
-        /* RESULTS TABLE */
-        .results-panel {
-            background: rgba(20, 40, 60, 0.6);
-            border: 1px solid rgba(0, 212, 170, 0.2);
-            border-radius: 10px; padding: 25px;
-        }
-        .results-title {
-            font-size: 16px; font-weight: 700; color: #00D4AA;
-            margin-bottom: 15px;
-        }
-        .results-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .results-table thead {
-            background: rgba(0, 212, 170, 0.08);
-            border-bottom: 2px solid rgba(0, 212, 170, 0.2);
-        }
-        .results-table th {
-            padding: 12px; text-align: left; color: #00D4AA;
-            font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
-        }
-        .results-table td {
-            padding: 12px; border-bottom: 1px solid rgba(0, 212, 170, 0.1);
-        }
-        .results-table tbody tr:hover { background: rgba(0, 212, 170, 0.05); }
-
-        .empty-state {
-            text-align: center; padding: 40px 20px;
-            color: rgba(224, 224, 224, 0.5);
-        }
-        .empty-icon { font-size: 48px; margin-bottom: 15px; opacity: 0.5; }
-
-        /* LOGIN */
-        .login-screen {
-            display: flex; align-items: center; justify-content: center;
-            height: 100vh;
-            background: linear-gradient(135deg, #0A1628 0%, #1a2a3f 100%);
-        }
-        .login-screen.hidden { display: none; }
-        .login-card {
-            background: rgba(20, 40, 60, 0.8);
-            border: 1px solid rgba(0, 212, 170, 0.3);
-            border-radius: 15px; padding: 40px;
-            max-width: 400px; width: 90%;
-        }
-        .login-logo { font-size: 28px; font-weight: 700; color: #00D4AA; margin-bottom: 10px; }
-        .login-subtitle { font-size: 13px; color: rgba(224, 224, 224, 0.6); margin-bottom: 30px; }
-        .login-form { display: flex; flex-direction: column; gap: 15px; }
-        .login-input {
-            background: rgba(10, 22, 40, 0.9);
-            border: 1px solid rgba(0, 212, 170, 0.2);
-            border-radius: 8px; padding: 12px; color: #e0e0e0;
-            font-size: 14px; font-family: 'Inter', sans-serif;
-        }
-        .login-input:focus { outline: none; border-color: #00D4AA; }
-        .login-input::placeholder { color: rgba(224, 224, 224, 0.4); }
-        .login-button {
-            background: linear-gradient(135deg, #00D4AA 0%, #00b894 100%);
-            border: none; color: #0A1628; padding: 12px; border-radius: 8px;
-            cursor: pointer; font-size: 14px; font-weight: 700;
-            transition: all 0.3s; margin-top: 10px;
-        }
-        .login-button:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 212, 170, 0.4); }
-        .login-hint {
-            font-size: 11px; color: rgba(224, 224, 224, 0.4);
-            margin-top: 20px; text-align: center; line-height: 1.5;
+        .btn-login:hover { background: var(--primary-dark); }
+        .btn-login:disabled { background: var(--gray-300); cursor: not-allowed; }
+        .login-footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: .75rem;
+            color: var(--gray-400);
         }
 
-        .placeholder-page {
-            text-align: center; padding: 60px 20px;
-            color: rgba(224, 224, 224, 0.5);
+        /* ─── RESPONSIVE ─── */
+        @media (max-width: 768px) {
+            .header { padding: 12px 16px; flex-direction: column; gap: 8px; }
+            .header h1 { font-size: 1.1rem; }
+            .user-info { text-align: center; }
+            .container { padding: 16px; }
+            .tabs { padding: 0 12px; }
+            .tab { padding: 10px 14px; font-size: .8rem; }
+            .card { padding: 16px; }
+            .upload-zone { padding: 32px 16px; }
+            .upload-zone .icon { font-size: 2rem; }
+            .stat-card { min-width: 90px; padding: 12px; }
+            .stat-card .number { font-size: 1.4rem; }
+            .result-summary { gap: 8px; }
+            .actions { flex-direction: column; }
+            .btn { width: 100%; justify-content: center; }
+            .login-card { margin: 16px; padding: 28px 24px; }
+            .history-item { flex-direction: column; align-items: flex-start; }
         }
-        .placeholder-page h2 { font-size: 24px; margin-bottom: 20px; color: rgba(0, 212, 170, 0.6); }
+        @media (max-width: 480px) {
+            .header-right { flex-direction: column; gap: 6px; }
+            .tab { padding: 8px 10px; font-size: .75rem; }
+        }
 
-        .spinner {
-            display: inline-block; width: 16px; height: 16px;
-            border: 2px solid rgba(10, 22, 40, 0.3);
-            border-top-color: #0A1628; border-radius: 50%;
-            animation: spin 0.8s linear infinite; vertical-align: middle;
+        /* ─── TOAST ─── */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--gray-800);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: .85rem;
+            box-shadow: var(--shadow-lg);
+            z-index: 10000;
+            animation: slideIn .3s ease;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-        .logout-btn {
-            background: rgba(0, 212, 170, 0.1);
-            border: 1px solid rgba(0, 212, 170, 0.3);
-            color: #00D4AA; padding: 8px 16px; border-radius: 6px;
-            cursor: pointer; font-size: 13px; font-weight: 500;
-        }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
 <!-- LOGIN -->
-<div class="login-screen" id="loginScreen">
+<div id="loginScreen" class="login-backdrop">
     <div class="login-card">
-        <div class="login-logo">🔐 AutoData</div>
-        <div class="login-subtitle">Procesador de Facturas</div>
-        <form class="login-form" id="loginForm">
-            <input type="email" class="login-input" id="email" placeholder="Email" required>
-            <input type="password" class="login-input" id="password" placeholder="Contraseña" required>
-            <button type="submit" class="login-button">Ingresar</button>
-            <div class="login-hint">
-                Demo: demo@dataintelligence.com / AutoData2025<br>
-                Operadora: operadora@dataintelligence.com / Operadora2025
+        <h1>AutoData</h1>
+        <p class="subtitle">Gestion Inteligente de Facturas</p>
+        <div id="loginError" class="login-error"></div>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" placeholder="tu@email.com" required autocomplete="email">
             </div>
+            <div class="form-group">
+                <label for="password">Contrasena</label>
+                <input type="password" id="password" placeholder="Tu contrasena" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn-login" id="btnLogin">Iniciar Sesion</button>
         </form>
+        <p class="login-footer">AutoData Technologies v3.0 — dataintelligence.com</p>
     </div>
 </div>
 
 <!-- APP -->
-<div class="app-container" id="appContainer" style="display: none;">
-    <div class="sidebar">
-        <div class="sidebar-header">
-            <div class="logo">AutoData</div>
-            <div class="logo-subtext">v2.0 Procesador</div>
+<div id="appContainer" class="hidden">
+    <header class="header">
+        <div class="header-left">
+            <h1>AutoData</h1>
+            <span class="version">v3.0</span>
         </div>
-        <ul class="nav-menu">
-            <li class="nav-item active" data-page="invoices">
-                <span>📄</span><span>Facturas</span>
-            </li>
-            <li class="nav-item disabled" data-page="forms">
-                <span>📋</span><span>Formularios</span>
-            </li>
-            <li class="nav-item disabled" data-page="legal">
-                <span>⚖️</span><span>Documentación Legal</span>
-            </li>
-            <li class="nav-item disabled" data-page="other">
-                <span>📦</span><span>Otros</span>
-            </li>
-        </ul>
-        <div style="flex:1;"></div>
-        <div style="padding: 20px; border-top: 1px solid rgba(0, 212, 170, 0.15);">
-            <button class="logout-btn" id="logoutButton">← Salir</button>
+        <div class="header-right">
+            <div class="user-info">
+                <div class="name" id="headerUserName">—</div>
+                <div class="empresa" id="headerEmpresa">—</div>
+            </div>
+            <button class="btn-logout" onclick="doLogout()">Cerrar Sesion</button>
         </div>
-    </div>
+    </header>
 
-    <div class="main-content">
-        <div class="header">
-            <h1 id="pageTitle">Procesar Facturas PDF</h1>
-        </div>
+    <nav class="tabs">
+        <div class="tab active" data-tab="upload" onclick="switchTab('upload')">Cargar Facturas</div>
+        <div class="tab" data-tab="preview" onclick="switchTab('preview')">Repositorio</div>
+        <div class="tab" data-tab="history" onclick="switchTab('history')">Historial</div>
+    </nav>
 
-        <div class="content">
-            <!-- FACTURAS PAGE -->
-            <div class="page active" id="invoicesPage">
+    <div class="container">
 
-                <!-- UPLOAD ZONE -->
-                <div class="upload-zone" id="uploadZone">
-                    <div class="icon">📂</div>
-                    <h3>Arrastra tus facturas PDF aquí</h3>
-                    <p>o haz clic para seleccionar archivos</p>
+        <!-- TAB: UPLOAD -->
+        <div id="tab-upload" class="section active">
+            <div class="card">
+                <h2>Subir Facturas PDF</h2>
+                <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                    <div class="icon">+</div>
+                    <p>Arrastra tus archivos PDF aqui</p>
+                    <p class="hint">o hace clic para seleccionar — podes subir varios a la vez</p>
                     <input type="file" id="fileInput" multiple accept=".pdf">
                 </div>
-
-                <!-- FILE LIST -->
-                <div class="file-list" id="fileList">
-                    <div class="file-list-title">📎 Archivos seleccionados (<span id="fileCount">0</span>)</div>
-                    <div id="fileItems"></div>
+                <div class="file-list" id="fileList"></div>
+                <div class="actions">
+                    <button class="btn btn-primary" id="btnProcess" disabled onclick="processFiles()">Procesar Facturas</button>
+                    <button class="btn btn-outline" id="btnClear" onclick="clearFiles()" style="display:none">Limpiar</button>
                 </div>
 
-                <!-- ACTION BUTTONS -->
-                <div class="action-row">
-                    <button class="process-btn" id="processBtn" disabled>▶ Procesar Facturas</button>
-                    <button class="clear-btn" id="clearBtn">Limpiar</button>
-                    <button class="download-btn" id="downloadBtn">📥 Descargar Repositorio Excel</button>
+                <!-- Progress -->
+                <div class="progress-container" id="progressContainer">
+                    <div class="progress-bar-outer">
+                        <div class="progress-bar-inner" id="progressBar" style="width: 0%">0%</div>
+                    </div>
+                    <p class="progress-status" id="progressStatus">Preparando...</p>
                 </div>
 
-                <!-- STATUS -->
-                <div class="status-panel" id="statusPanel">
-                    <div class="status-message" id="statusMessage"></div>
-                </div>
-
-                <!-- RESULTS TABLE -->
-                <div class="results-panel">
-                    <div class="results-title">📋 Documentos Procesados</div>
-                    <table class="results-table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Nombre del Archivo</th>
-                                <th>Estado</th>
-                                <th>Detalle</th>
-                            </tr>
-                        </thead>
-                        <tbody id="resultsTableBody">
-                            <tr><td colspan="4" class="empty-state">
-                                <div class="empty-icon">📁</div>
-                                <div>Subi tus facturas PDF para procesarlas</div>
-                            </td></tr>
-                        </tbody>
-                    </table>
+                <!-- Results -->
+                <div class="results" id="resultsContainer">
+                    <h2>Resultados del Procesamiento</h2>
+                    <div class="result-summary" id="resultSummary"></div>
+                    <ul class="doc-list" id="docList"></ul>
+                    <div class="actions" id="postActions"></div>
                 </div>
             </div>
+        </div>
 
-            <div class="page" id="formsPage">
-                <div class="placeholder-page"><h2>Formularios</h2><p>Disponible próximamente</p></div>
+        <!-- TAB: PREVIEW -->
+        <div id="tab-preview" class="section">
+            <div class="card">
+                <h2>Repositorio de Facturas</h2>
+                <div class="actions" style="margin-top:0;margin-bottom:16px">
+                    <button class="btn btn-outline" onclick="loadPreview()">Actualizar</button>
+                    <button class="btn btn-success" onclick="downloadExcel()">Descargar Excel</button>
+                </div>
+                <div id="previewContent">
+                    <div class="empty-state">
+                        <div class="icon">...</div>
+                        <p>Cargando datos del repositorio...</p>
+                    </div>
+                </div>
             </div>
-            <div class="page" id="legalPage">
-                <div class="placeholder-page"><h2>Documentación Legal</h2><p>Disponible próximamente</p></div>
-            </div>
-            <div class="page" id="otherPage">
-                <div class="placeholder-page"><h2>Otros</h2><p>Disponible próximamente</p></div>
+        </div>
+
+        <!-- TAB: HISTORY -->
+        <div id="tab-history" class="section">
+            <div class="card">
+                <h2>Historial de Procesamiento</h2>
+                <div id="historyContent">
+                    <div class="empty-state">
+                        <div class="icon">...</div>
+                        <p>Cargando historial...</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-const DEMO_USERS = {
-    'demo@dataintelligence.com':      { password: 'AutoData2025',  role: 'admin' },
-    'operadora@dataintelligence.com': { password: 'Operadora2025', role: 'operator' }
-};
+/* ═══════════════════════════════════════════════
+   AutoData Frontend v3.0
+   ═══════════════════════════════════════════════ */
 
+const API = '';
+let authToken = null;
+let currentUser = null;
 let selectedFiles = [];
 
-// LOGIN
-document.getElementById('loginForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const email = document.getElementById('email').value.trim().toLowerCase();
-    const password = document.getElementById('password').value;
-    const user = DEMO_USERS[email];
-    if (user && user.password === password) {
-        document.querySelector('.login-button').textContent = 'Ingresando...';
-        setTimeout(() => {
-            document.getElementById('loginScreen').classList.add('hidden');
-            document.getElementById('appContainer').style.display = 'flex';
-        }, 400);
-    } else {
-        alert('Credenciales inválidas');
-    }
-});
+// ─── AUTH ───
 
-// NAV
-document.querySelectorAll('.nav-item').forEach(item => {
-    if (!item.classList.contains('disabled')) {
-        item.addEventListener('click', function() {
-            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-            this.classList.add('active');
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById(this.dataset.page + 'Page').classList.add('active');
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btnLogin');
+    const errDiv = document.getElementById('loginError');
+    btn.disabled = true;
+    btn.textContent = 'Ingresando...';
+    errDiv.style.display = 'none';
+
+    try {
+        const res = await fetch(API + '/ad-api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: document.getElementById('email').value.trim(),
+                password: document.getElementById('password').value
+            })
         });
+        const data = await res.json();
+        if (data.error) {
+            errDiv.textContent = data.mensaje || 'Credenciales incorrectas.';
+            errDiv.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Iniciar Sesion';
+            return;
+        }
+        authToken = data.token;
+        currentUser = data.usuario;
+        sessionStorage.setItem('ad_token', authToken);
+        sessionStorage.setItem('ad_user', JSON.stringify(currentUser));
+        showApp();
+    } catch (err) {
+        errDiv.textContent = 'Error de conexion. Intenta de nuevo.';
+        errDiv.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Iniciar Sesion';
     }
 });
 
-// UPLOAD ZONE - click
-document.getElementById('uploadZone').addEventListener('click', function() {
-    document.getElementById('fileInput').click();
-});
+function showApp() {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('appContainer').classList.remove('hidden');
+    document.getElementById('headerUserName').textContent = currentUser.nombre;
+    document.getElementById('headerEmpresa').textContent = currentUser.empresa;
+}
 
-// UPLOAD ZONE - drag & drop
-const uploadZone = document.getElementById('uploadZone');
-uploadZone.addEventListener('dragover', function(e) {
-    e.preventDefault();
-    this.classList.add('dragover');
+async function doLogout() {
+    try {
+        await apiFetch('/ad-api/auth/logout', { method: 'POST' });
+    } catch (_) {}
+    authToken = null;
+    currentUser = null;
+    sessionStorage.removeItem('ad_token');
+    sessionStorage.removeItem('ad_user');
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('appContainer').classList.add('hidden');
+    document.getElementById('email').value = '';
+    document.getElementById('password').value = '';
+}
+
+// Auto-restore session
+(function checkSession() {
+    const t = sessionStorage.getItem('ad_token');
+    const u = sessionStorage.getItem('ad_user');
+    if (t && u) {
+        authToken = t;
+        currentUser = JSON.parse(u);
+        showApp();
+    }
+})();
+
+// ─── API HELPER ───
+
+async function apiFetch(path, opts = {}) {
+    opts.headers = opts.headers || {};
+    if (authToken) opts.headers['X-AutoData-Token'] = authToken;
+    const res = await fetch(API + path, opts);
+    if (res.status === 401) {
+        toast('Sesion expirada. Inicia sesion nuevamente.');
+        doLogout();
+        throw new Error('Unauthorized');
+    }
+    return res;
+}
+
+// ─── TABS ───
+
+function switchTab(tabId) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelector('.tab[data-tab="' + tabId + '"]').classList.add('active');
+    document.getElementById('tab-' + tabId).classList.add('active');
+    if (tabId === 'preview') loadPreview();
+    if (tabId === 'history') loadHistory();
+}
+
+// ─── FILE HANDLING ───
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+['dragenter', 'dragover'].forEach(function(ev) {
+    dropZone.addEventListener(ev, function(e) { e.preventDefault(); dropZone.classList.add('dragover'); });
 });
-uploadZone.addEventListener('dragleave', function() {
-    this.classList.remove('dragover');
+['dragleave', 'drop'].forEach(function(ev) {
+    dropZone.addEventListener(ev, function(e) { e.preventDefault(); dropZone.classList.remove('dragover'); });
 });
-uploadZone.addEventListener('drop', function(e) {
-    e.preventDefault();
-    this.classList.remove('dragover');
-    const files = Array.from(e.dataTransfer.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+dropZone.addEventListener('drop', function(e) {
+    var files = Array.from(e.dataTransfer.files).filter(function(f) { return f.name.toLowerCase().endsWith('.pdf'); });
     addFiles(files);
 });
-
-// FILE INPUT
-document.getElementById('fileInput').addEventListener('change', function() {
-    const files = Array.from(this.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
-    addFiles(files);
-    this.value = '';
+fileInput.addEventListener('change', function() {
+    addFiles(Array.from(fileInput.files));
+    fileInput.value = '';
 });
 
 function addFiles(files) {
-    files.forEach(f => {
-        if (!selectedFiles.find(sf => sf.name === f.name)) {
+    files.forEach(function(f) {
+        if (!selectedFiles.find(function(s) { return s.name === f.name && s.size === f.size; })) {
             selectedFiles.push(f);
         }
     });
     renderFileList();
-}
-
-function renderFileList() {
-    const container = document.getElementById('fileItems');
-    const listDiv = document.getElementById('fileList');
-    document.getElementById('fileCount').textContent = selectedFiles.length;
-
-    if (selectedFiles.length === 0) {
-        listDiv.classList.remove('active');
-        document.getElementById('processBtn').disabled = true;
-        return;
-    }
-
-    listDiv.classList.add('active');
-    document.getElementById('processBtn').disabled = false;
-
-    container.innerHTML = selectedFiles.map((f, i) => `
-        <div class="file-item">
-            <span class="name">📄 ${f.name}</span>
-            <span class="size">${(f.size / 1024).toFixed(1)} KB</span>
-            <button class="remove" onclick="removeFile(${i})">✕</button>
-        </div>
-    `).join('');
 }
 
 function removeFile(idx) {
@@ -473,107 +694,186 @@ function removeFile(idx) {
     renderFileList();
 }
 
-// CLEAR
-document.getElementById('clearBtn').addEventListener('click', function() {
+function clearFiles() {
     selectedFiles = [];
     renderFileList();
-    document.getElementById('statusPanel').classList.remove('active');
-    document.getElementById('downloadBtn').classList.remove('active');
-    document.getElementById('resultsTableBody').innerHTML = `
-        <tr><td colspan="4" class="empty-state">
-            <div class="empty-icon">📁</div>
-            <div>Subi tus facturas PDF para procesarlas</div>
-        </td></tr>`;
-});
+    document.getElementById('resultsContainer').classList.remove('visible');
+    document.getElementById('progressContainer').classList.remove('visible');
+}
 
-// PROCESS
-document.getElementById('processBtn').addEventListener('click', async function() {
+function renderFileList() {
+    var list = document.getElementById('fileList');
+    var btn = document.getElementById('btnProcess');
+    var btnClear = document.getElementById('btnClear');
+    list.innerHTML = selectedFiles.map(function(f, i) {
+        return '<span class="file-tag">' + esc(f.name) + ' <span class="remove" onclick="removeFile(' + i + ')">x</span></span>';
+    }).join('');
+    btn.disabled = selectedFiles.length === 0;
+    btnClear.style.display = selectedFiles.length > 0 ? 'inline-flex' : 'none';
+}
+
+// ─── PROCESS ───
+
+async function processFiles() {
     if (selectedFiles.length === 0) return;
+    var btn = document.getElementById('btnProcess');
+    btn.disabled = true;
+    document.getElementById('resultsContainer').classList.remove('visible');
 
-    const statusPanel = document.getElementById('statusPanel');
-    const statusMsg = document.getElementById('statusMessage');
+    // Show progress
+    var pc = document.getElementById('progressContainer');
+    pc.classList.add('visible');
+    setProgress(10, 'Subiendo archivos al servidor...');
 
-    this.disabled = true;
-    this.innerHTML = '<span class="spinner"></span> Procesando...';
-    statusMsg.textContent = '⏳ Subiendo y procesando ' + selectedFiles.length + ' archivos...';
-    statusMsg.className = 'status-message info';
-    statusPanel.classList.add('active');
+    var formData = new FormData();
+    selectedFiles.forEach(function(f) { formData.append('pdfs', f); });
 
-    const formData = new FormData();
-    selectedFiles.forEach(f => formData.append('pdfs', f));
+    setProgress(30, 'Procesando ' + selectedFiles.length + ' archivo(s)...');
 
     try {
-        const response = await fetch('/ad-api/invoices/upload-process', {
+        var res = await apiFetch('/ad-api/invoices/upload-process', {
             method: 'POST',
             body: formData
         });
+        setProgress(80, 'Analizando resultados...');
+        var data = await res.json();
 
-        const result = await response.json();
-
-        if (response.ok && !result.error) {
-            statusMsg.innerHTML = `
-                <strong>✅ Tus facturas ya están cargadas en el repositorio</strong><br>
-                Facturas nuevas: ${result.new_invoices || 0}<br>
-                Duplicadas (ya existían): ${result.skipped || 0}<br>
-                Otros documentos: ${result.other_docs || 0}<br>
-                ${result.new_invoices > 0 ? '📥 Descargando Excel automáticamente...' : ''}
-            `;
-            statusMsg.className = 'status-message success';
-
-            // Auto-download Excel after processing
-            if (result.excel_download && result.new_invoices > 0) {
-                const dlBtn = document.getElementById('downloadBtn');
-                dlBtn.classList.add('active');
-                dlBtn.onclick = function() {
-                    window.location.href = result.excel_download;
-                };
-                // Descarga automática
-                setTimeout(() => {
-                    window.location.href = result.excel_download;
-                }, 800);
-            }
-
-            // Update table
-            updateResultsTable(result.documents || []);
-        } else {
-            statusMsg.textContent = '❌ ' + (result.mensaje || 'Error desconocido');
-            statusMsg.className = 'status-message error';
+        if (data.error) {
+            setProgress(100, 'Error: ' + data.mensaje);
+            btn.disabled = false;
+            return;
         }
-    } catch (error) {
-        statusMsg.textContent = '❌ Error de conexión: ' + error.message;
-        statusMsg.className = 'status-message error';
+
+        setProgress(100, 'Procesamiento completado');
+        showResults(data);
+    } catch (err) {
+        setProgress(100, 'Error de conexion: ' + err.message);
+        btn.disabled = false;
     }
-
-    this.disabled = false;
-    this.innerHTML = '▶ Procesar Facturas';
-    if (selectedFiles.length > 0) this.disabled = false;
-});
-
-function updateResultsTable(documents) {
-    const tbody = document.getElementById('resultsTableBody');
-    if (!documents || documents.length === 0) return;
-    tbody.innerHTML = documents.map((doc, idx) => `
-        <tr>
-            <td>${idx + 1}</td>
-            <td>${doc.nombre || 'Sin nombre'}</td>
-            <td>${doc.estado === 'procesado' ? '✅ Cargado' :
-                  doc.estado === 'duplicado' ? '⏭ Duplicado' :
-                  '⚠️ ' + (doc.estado || 'Otro')}</td>
-            <td>${doc.detalle || doc.numero_comprobante || '-'}</td>
-        </tr>
-    `).join('');
 }
 
-// LOGOUT
-document.getElementById('logoutButton').addEventListener('click', function() {
-    document.getElementById('appContainer').style.display = 'none';
-    document.getElementById('loginScreen').classList.remove('hidden');
-    document.getElementById('email').value = '';
-    document.getElementById('password').value = '';
-    document.querySelector('.login-button').textContent = 'Ingresar';
-    selectedFiles = [];
-    renderFileList();
-});
+function setProgress(pct, msg) {
+    var bar = document.getElementById('progressBar');
+    bar.style.width = pct + '%';
+    bar.textContent = pct + '%';
+    document.getElementById('progressStatus').textContent = msg;
+}
+
+function showResults(data) {
+    var rc = document.getElementById('resultsContainer');
+    rc.classList.add('visible');
+
+    // Summary cards
+    document.getElementById('resultSummary').innerHTML =
+        '<div class="stat-card stat-new"><div class="number">' + data.new_invoices + '</div><div class="label">Nuevas</div></div>' +
+        '<div class="stat-card stat-skip"><div class="number">' + data.skipped + '</div><div class="label">Duplicadas</div></div>' +
+        '<div class="stat-card stat-other"><div class="number">' + data.other_docs + '</div><div class="label">Otros</div></div>';
+
+    // Document list
+    var dl = document.getElementById('docList');
+    dl.innerHTML = (data.documents || []).map(function(d) {
+        var cls = d.estado === 'procesado' ? 'badge-ok' : d.estado === 'duplicado' ? 'badge-skip' : 'badge-err';
+        var label = d.estado === 'procesado' ? 'NUEVA' : d.estado === 'duplicado' ? 'DUPLICADA' : 'OTRO';
+        return '<li class="doc-item"><span class="badge ' + cls + '">' + label + '</span><strong>' + esc(d.nombre) + '</strong><span style="color:var(--gray-500)">' + esc(d.detalle) + '</span></li>';
+    }).join('');
+
+    // Post actions
+    document.getElementById('postActions').innerHTML =
+        '<button class="btn btn-success" onclick="downloadExcel()">Descargar Excel</button>' +
+        '<button class="btn btn-outline" onclick="clearFiles()">Procesar mas</button>';
+}
+
+// ─── DOWNLOAD EXCEL ───
+
+async function downloadExcel() {
+    try {
+        var res = await apiFetch('/ad-api/invoices/download-excel');
+        if (!res.ok) { toast('El repositorio aun no fue creado.'); return; }
+        var blob = await res.blob();
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'repositorio_facturas.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        toast('Excel descargado correctamente');
+    } catch (err) {
+        toast('Error al descargar: ' + err.message);
+    }
+}
+
+// ─── PREVIEW ───
+
+async function loadPreview() {
+    var container = document.getElementById('previewContent');
+    container.innerHTML = '<div class="empty-state"><p>Cargando...</p></div>';
+    try {
+        var res = await apiFetch('/ad-api/invoices/preview');
+        var data = await res.json();
+        if (!data.rows || data.rows.length === 0) {
+            container.innerHTML = '<div class="empty-state"><p>No hay facturas en el repositorio todavia.<br>Subi facturas en la pestana "Cargar Facturas".</p></div>';
+            return;
+        }
+        var html = '<p style="margin-bottom:12px;font-size:.85rem;color:var(--gray-500)">' + data.total + ' factura(s) en el repositorio</p>';
+        html += '<div class="table-wrap"><table><thead><tr>';
+        html += '<th>Tipo</th><th>Pto. Vta.</th><th>Nro. Comp.</th><th>Fecha</th><th>Emisor</th><th>Cliente</th><th>Producto</th><th>Importe</th><th>CAE</th><th>Archivo</th>';
+        html += '</tr></thead><tbody>';
+        data.rows.forEach(function(r) {
+            var imp = typeof r.importe === 'number' ? '$' + r.importe.toLocaleString('es-AR', {minimumFractionDigits: 2}) : r.importe;
+            html += '<tr><td>' + esc(r.tipo) + '</td><td>' + esc(r.punto_vta) + '</td><td>' + esc(r.nro_comp) + '</td><td>' + esc(r.fecha) + '</td><td>' + esc(r.emisor) + '</td><td>' + esc(r.cliente) + '</td><td>' + esc(r.producto) + '</td><td>' + imp + '</td><td style="font-size:.7rem">' + esc(r.cae) + '</td><td style="font-size:.7rem">' + esc(r.archivo) + '</td></tr>';
+        });
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+    } catch (err) {
+        container.innerHTML = '<div class="empty-state"><p>Error al cargar: ' + esc(err.message) + '</p></div>';
+    }
+}
+
+// ─── HISTORY ───
+
+async function loadHistory() {
+    var container = document.getElementById('historyContent');
+    container.innerHTML = '<div class="empty-state"><p>Cargando...</p></div>';
+    try {
+        var res = await apiFetch('/ad-api/invoices/history');
+        var data = await res.json();
+        if (!data.historial || data.historial.length === 0) {
+            container.innerHTML = '<div class="empty-state"><p>No hay historial de procesamiento todavia.</p></div>';
+            return;
+        }
+        container.innerHTML = data.historial.map(function(h) {
+            var fecha = h.fecha ? new Date(h.fecha).toLocaleString('es-AR') : '—';
+            return '<div class="history-item">' +
+                '<div><strong>' + esc(h.usuario_email || '—') + '</strong><div class="history-date">' + fecha + '</div></div>' +
+                '<div class="history-stats">' +
+                '<span style="background:var(--success-light);color:var(--success)">' + h.facturas_nuevas + ' nuevas</span>' +
+                '<span style="background:var(--warning-light);color:var(--warning)">' + h.duplicadas + ' dup.</span>' +
+                '<span style="background:var(--gray-100);color:var(--gray-600)">' + h.archivos_total + ' archivos</span>' +
+                '</div></div>';
+        }).join('');
+    } catch (err) {
+        container.innerHTML = '<div class="empty-state"><p>Error al cargar historial</p></div>';
+    }
+}
+
+// ─── UTILS ───
+
+function esc(s) {
+    if (s == null) return '';
+    var d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+}
+
+function toast(msg) {
+    var t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function() { t.remove(); }, 3500);
+}
 </script>
 </body>
 </html>
