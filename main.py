@@ -739,6 +739,145 @@ def processing_history():
 
 
 # ═══════════════════════════════════════════════
+# ADMIN — GESTIÓN DE CLIENTES / USUARIOS
+# ═══════════════════════════════════════════════
+
+def requiere_admin(f):
+    @wraps(f)
+    def decorado(*args, **kwargs):
+        token = request.headers.get("X-AutoData-Token") or request.args.get("token")
+        usuario = verificar_token(token)
+        if not usuario:
+            return jsonify({"error": True, "mensaje": "Sesión inválida o expirada."}), 401
+        if usuario.get("rol") != "admin":
+            return jsonify({"error": True, "mensaje": "Se requieren permisos de administrador."}), 403
+        request.usuario = usuario
+        return f(*args, **kwargs)
+    return decorado
+
+
+@app.route("/ad-api/admin/users", methods=["GET"])
+@requiere_admin
+def admin_list_users():
+    """Lista todos los usuarios del sistema."""
+    conn = get_db()
+    rows = conn.execute("""SELECT id, email, nombre, rol, empresa, empresa_id, activo,
+        ultimo_login, creado FROM usuarios ORDER BY creado DESC""").fetchall()
+    conn.close()
+    return jsonify({"users": [dict(r) for r in rows]})
+
+
+@app.route("/ad-api/admin/users", methods=["POST"])
+@requiere_admin
+def admin_create_user():
+    """Crea un nuevo usuario/cliente."""
+    data = request.get_json() or {}
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "").strip()
+    nombre = data.get("nombre", "").strip()
+    rol = data.get("rol", "operator").strip()
+    empresa = data.get("empresa", "").strip()
+    empresa_id = data.get("empresa_id", "").strip()
+
+    if not email or not password or not nombre or not empresa:
+        return jsonify({"error": True, "mensaje": "Faltan campos: email, password, nombre, empresa."}), 400
+
+    if len(password) < 6:
+        return jsonify({"error": True, "mensaje": "La contraseña debe tener al menos 6 caracteres."}), 400
+
+    if rol not in ("admin", "operator"):
+        rol = "operator"
+
+    # Auto-generar empresa_id si no se provee
+    if not empresa_id:
+        empresa_id = re.sub(r'[^a-z0-9]', '', empresa.lower())[:20] or "empresa"
+
+    conn = get_db()
+    exists = conn.execute("SELECT id FROM usuarios WHERE email=?", (email,)).fetchone()
+    if exists:
+        conn.close()
+        return jsonify({"error": True, "mensaje": f"Ya existe un usuario con el email {email}."}), 409
+
+    conn.execute("""INSERT INTO usuarios (email, password_hash, nombre, rol, empresa, empresa_id)
+        VALUES (?, ?, ?, ?, ?, ?)""",
+        (email, _hash_password(password), nombre, rol, empresa, empresa_id))
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "error": False,
+        "mensaje": f"Usuario {nombre} ({email}) creado exitosamente.",
+        "usuario": {"email": email, "nombre": nombre, "rol": rol, "empresa": empresa, "empresa_id": empresa_id}
+    }), 201
+
+
+@app.route("/ad-api/admin/users/<int:user_id>", methods=["PUT"])
+@requiere_admin
+def admin_update_user(user_id):
+    """Actualiza un usuario existente (activar/desactivar, cambiar rol, reset password)."""
+    data = request.get_json() or {}
+    conn = get_db()
+    user = conn.execute("SELECT * FROM usuarios WHERE id=?", (user_id,)).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({"error": True, "mensaje": "Usuario no encontrado."}), 404
+
+    updates = []
+    params = []
+
+    if "activo" in data:
+        updates.append("activo=?")
+        params.append(1 if data["activo"] else 0)
+    if "rol" in data and data["rol"] in ("admin", "operator"):
+        updates.append("rol=?")
+        params.append(data["rol"])
+    if "nombre" in data and data["nombre"].strip():
+        updates.append("nombre=?")
+        params.append(data["nombre"].strip())
+    if "password" in data and len(data["password"]) >= 6:
+        updates.append("password_hash=?")
+        params.append(_hash_password(data["password"]))
+    if "empresa" in data and data["empresa"].strip():
+        updates.append("empresa=?")
+        params.append(data["empresa"].strip())
+    if "empresa_id" in data and data["empresa_id"].strip():
+        updates.append("empresa_id=?")
+        params.append(data["empresa_id"].strip())
+
+    if not updates:
+        conn.close()
+        return jsonify({"error": True, "mensaje": "No se proporcionaron campos para actualizar."}), 400
+
+    params.append(user_id)
+    conn.execute(f"UPDATE usuarios SET {', '.join(updates)} WHERE id=?", params)
+    conn.commit()
+    conn.close()
+
+    return jsonify({"error": False, "mensaje": "Usuario actualizado exitosamente."})
+
+
+@app.route("/ad-api/admin/users/<int:user_id>", methods=["DELETE"])
+@requiere_admin
+def admin_delete_user(user_id):
+    """Desactiva un usuario (no lo borra)."""
+    conn = get_db()
+    user = conn.execute("SELECT * FROM usuarios WHERE id=?", (user_id,)).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({"error": True, "mensaje": "Usuario no encontrado."}), 404
+
+    # No permitir eliminarse a sí mismo
+    if user["id"] == request.usuario["id"]:
+        conn.close()
+        return jsonify({"error": True, "mensaje": "No podés desactivar tu propia cuenta."}), 400
+
+    conn.execute("UPDATE usuarios SET activo=0 WHERE id=?", (user_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"error": False, "mensaje": f"Usuario {user['email']} desactivado."})
+
+
+# ═══════════════════════════════════════════════
 # ERROR HANDLERS
 # ═══════════════════════════════════════════════
 
