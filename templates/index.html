@@ -437,6 +437,67 @@
         }
         @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
+        /* ─── ADMIN ─── */
+        .form-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 0;
+        }
+        .form-row .form-group { flex: 1; }
+        .form-group select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: .9rem;
+            outline: none;
+            background: white;
+        }
+        .success-msg {
+            background: var(--success-light);
+            color: var(--success);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: .85rem;
+            margin-bottom: 12px;
+            display: none;
+        }
+        .user-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--gray-100);
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .user-row:last-child { border-bottom: none; }
+        .user-row .user-main { flex: 1; min-width: 200px; }
+        .user-row .user-main strong { font-size: .9rem; }
+        .user-row .user-meta { font-size: .75rem; color: var(--gray-500); }
+        .user-row .user-actions { display: flex; gap: 8px; }
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: .75rem;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .btn-sm-danger { background: var(--danger-light); color: var(--danger); }
+        .btn-sm-danger:hover { background: #fca5a5; }
+        .btn-sm-success { background: var(--success-light); color: var(--success); }
+        .btn-sm-success:hover { background: #86efac; }
+        .badge-active { background: var(--success-light); color: var(--success); }
+        .badge-inactive { background: var(--danger-light); color: var(--danger); }
+        .badge-admin { background: var(--primary-light); color: var(--primary); }
+        .badge-operator { background: var(--gray-100); color: var(--gray-600); }
+
+        @media (max-width: 768px) {
+            .form-row { flex-direction: column; gap: 0; }
+            .user-row { flex-direction: column; align-items: flex-start; }
+        }
+
         .hidden { display: none !important; }
     </style>
 </head>
@@ -483,6 +544,7 @@
         <div class="tab active" data-tab="upload" onclick="switchTab('upload')">Cargar Facturas</div>
         <div class="tab" data-tab="preview" onclick="switchTab('preview')">Repositorio</div>
         <div class="tab" data-tab="history" onclick="switchTab('history')">Historial</div>
+        <div class="tab hidden" data-tab="admin" id="tabAdmin" onclick="switchTab('admin')">Admin</div>
     </nav>
 
     <div class="container">
@@ -550,6 +612,65 @@
                 </div>
             </div>
         </div>
+
+        <!-- TAB: ADMIN -->
+        <div id="tab-admin" class="section">
+            <!-- Crear nuevo usuario -->
+            <div class="card">
+                <h2>Crear Nuevo Cliente / Usuario</h2>
+                <div id="createUserError" class="login-error"></div>
+                <div id="createUserSuccess" class="success-msg"></div>
+                <form id="createUserForm" onsubmit="createUser(event)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Nombre</label>
+                            <input type="text" id="nuNombre" placeholder="Nombre del usuario" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="nuEmail" placeholder="email@empresa.com" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Contrasena</label>
+                            <input type="text" id="nuPassword" placeholder="Minimo 6 caracteres" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Rol</label>
+                            <select id="nuRol">
+                                <option value="operator">Operador</option>
+                                <option value="admin">Administrador</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Empresa (nombre visible)</label>
+                            <input type="text" id="nuEmpresa" placeholder="Nombre de la empresa" required>
+                        </div>
+                        <div class="form-group">
+                            <label>ID Empresa (sin espacios, para separar datos)</label>
+                            <input type="text" id="nuEmpresaId" placeholder="Se genera automaticamente si lo dejas vacio">
+                        </div>
+                    </div>
+                    <div class="actions" style="margin-top:12px">
+                        <button type="submit" class="btn btn-primary" id="btnCreateUser">Crear Usuario</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Lista de usuarios -->
+            <div class="card">
+                <h2>Usuarios Registrados</h2>
+                <div class="actions" style="margin-top:0;margin-bottom:16px">
+                    <button class="btn btn-outline" onclick="loadUsers()">Actualizar Lista</button>
+                </div>
+                <div id="usersListContent">
+                    <div class="empty-state"><p>Cargando...</p></div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -608,6 +729,13 @@ function showApp() {
     document.getElementById('appContainer').classList.remove('hidden');
     document.getElementById('headerUserName').textContent = currentUser.nombre;
     document.getElementById('headerEmpresa').textContent = currentUser.empresa;
+    // Mostrar tab Admin solo para admins
+    var adminTab = document.getElementById('tabAdmin');
+    if (currentUser.rol === 'admin') {
+        adminTab.classList.remove('hidden');
+    } else {
+        adminTab.classList.add('hidden');
+    }
 }
 
 async function doLogout() {
@@ -658,6 +786,7 @@ function switchTab(tabId) {
     document.getElementById('tab-' + tabId).classList.add('active');
     if (tabId === 'preview') loadPreview();
     if (tabId === 'history') loadHistory();
+    if (tabId === 'admin') loadUsers();
 }
 
 // ─── FILE HANDLING ───
@@ -873,6 +1002,102 @@ function toast(msg) {
     t.textContent = msg;
     document.body.appendChild(t);
     setTimeout(function() { t.remove(); }, 3500);
+}
+
+// ─── ADMIN ───
+
+async function createUser(e) {
+    e.preventDefault();
+    var errDiv = document.getElementById('createUserError');
+    var okDiv = document.getElementById('createUserSuccess');
+    errDiv.style.display = 'none';
+    okDiv.style.display = 'none';
+
+    var payload = {
+        nombre: document.getElementById('nuNombre').value.trim(),
+        email: document.getElementById('nuEmail').value.trim(),
+        password: document.getElementById('nuPassword').value,
+        rol: document.getElementById('nuRol').value,
+        empresa: document.getElementById('nuEmpresa').value.trim(),
+        empresa_id: document.getElementById('nuEmpresaId').value.trim()
+    };
+
+    try {
+        var res = await apiFetch('/ad-api/admin/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        var data = await res.json();
+        if (data.error) {
+            errDiv.textContent = data.mensaje;
+            errDiv.style.display = 'block';
+            return;
+        }
+        okDiv.textContent = data.mensaje;
+        okDiv.style.display = 'block';
+        document.getElementById('createUserForm').reset();
+        loadUsers();
+    } catch (err) {
+        errDiv.textContent = 'Error de conexion.';
+        errDiv.style.display = 'block';
+    }
+}
+
+async function loadUsers() {
+    var container = document.getElementById('usersListContent');
+    container.innerHTML = '<div class="empty-state"><p>Cargando...</p></div>';
+    try {
+        var res = await apiFetch('/ad-api/admin/users');
+        var data = await res.json();
+        if (!data.users || data.users.length === 0) {
+            container.innerHTML = '<div class="empty-state"><p>No hay usuarios.</p></div>';
+            return;
+        }
+        container.innerHTML = data.users.map(function(u) {
+            var activo = u.activo ? 'badge-active' : 'badge-inactive';
+            var activoTxt = u.activo ? 'Activo' : 'Inactivo';
+            var rolCls = u.rol === 'admin' ? 'badge-admin' : 'badge-operator';
+            var rolTxt = u.rol === 'admin' ? 'Admin' : 'Operador';
+            var login = u.ultimo_login ? new Date(u.ultimo_login).toLocaleDateString('es-AR') : 'Nunca';
+            var toggleBtn = u.activo
+                ? '<button class="btn-sm btn-sm-danger" onclick="toggleUser(' + u.id + ', false)">Desactivar</button>'
+                : '<button class="btn-sm btn-sm-success" onclick="toggleUser(' + u.id + ', true)">Activar</button>';
+            return '<div class="user-row">' +
+                '<div class="user-main"><strong>' + esc(u.nombre) + '</strong> — ' + esc(u.email) +
+                '<div class="user-meta">' + esc(u.empresa) + ' (ID: ' + esc(u.empresa_id) + ') | Ultimo login: ' + login + ' | Creado: ' + (u.creado ? new Date(u.creado).toLocaleDateString('es-AR') : '—') + '</div></div>' +
+                '<div style="display:flex;gap:6px;align-items:center">' +
+                '<span class="badge ' + rolCls + '">' + rolTxt + '</span>' +
+                '<span class="badge ' + activo + '">' + activoTxt + '</span>' +
+                toggleBtn +
+                '</div></div>';
+        }).join('');
+    } catch (err) {
+        container.innerHTML = '<div class="empty-state"><p>Error al cargar usuarios.</p></div>';
+    }
+}
+
+async function toggleUser(userId, activate) {
+    try {
+        if (activate) {
+            await apiFetch('/ad-api/admin/users/' + userId, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ activo: true })
+            });
+            toast('Usuario activado');
+        } else {
+            var res = await apiFetch('/ad-api/admin/users/' + userId, {
+                method: 'DELETE'
+            });
+            var data = await res.json();
+            if (data.error) { toast(data.mensaje); return; }
+            toast('Usuario desactivado');
+        }
+        loadUsers();
+    } catch (err) {
+        toast('Error: ' + err.message);
+    }
 }
 </script>
 </body>
