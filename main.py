@@ -250,20 +250,22 @@ EXCEL_HEADERS = [
     'CUIT Emisor', 'Razón Social Emisor', 'Domicilio Emisor', 'Cond. IVA Emisor',
     'CUIT Cliente', 'Razón Social Cliente', 'Domicilio Cliente', 'Cond. IVA Cliente',
     'Cond. Venta', 'Per. Desde', 'Per. Hasta', 'Vto. Pago',
-    'Producto / Servicio', 'Importe Total ($)', 'CAE N°', 'Vto. CAE', 'Archivo PDF'
+    'Producto / Servicio', 'Importe Total ($)', 'CAE N°', 'Vto. CAE',
+    'Categoría', 'Centro de Costo', 'Importe USD', 'Tipo Cambio', 'Alertas', 'Archivo PDF'
 ]
 
 HEADER_GROUPS = [
     ('A3', 'C3', 'COMPROBANTE'), ('D3', 'H3', 'EMISOR'),
     ('I3', 'M3', 'CLIENTE'), ('N3', 'P3', 'PERÍODO / VTO.'),
-    ('Q3', 'Q3', 'DETALLE'), ('R3', 'S3', 'IMPORTES / CAE'), ('T3', 'U3', 'ARCHIVO'),
+    ('Q3', 'Q3', 'DETALLE'), ('R3', 'T3', 'IMPORTES / CAE'),
+    ('U3', 'V3', 'CLASIFICACIÓN'), ('W3', 'X3', 'MULTIMONEDA'), ('Y3', 'Z3', 'AUDITORÍA'),
 ]
 
 COL_WIDTHS = {
     'A': 12, 'B': 10, 'C': 14, 'D': 14, 'E': 18, 'F': 28,
     'G': 36, 'H': 18, 'I': 18, 'J': 32, 'K': 40, 'L': 20,
     'M': 12, 'N': 12, 'O': 12, 'P': 12, 'Q': 24, 'R': 18,
-    'S': 20, 'T': 12, 'U': 44
+    'S': 20, 'T': 12, 'U': 16, 'V': 20, 'W': 16, 'X': 14, 'Y': 40, 'Z': 44
 }
 
 YELLOW_FILL = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid") if EXCEL_SUPPORT else None
@@ -285,7 +287,7 @@ def get_or_create_excel(empresa_id, empresa_nombre=""):
         try:
             wb = load_workbook(excel_path)
             ws = wb.active
-            if ws.cell(row=4, column=1).value == 'Tipo Comp.' and ws.max_column >= 21:
+            if ws.cell(row=4, column=1).value == 'Tipo Comp.' and ws.max_column >= 26:
                 return wb
             wb.close()
             os.remove(excel_path)
@@ -299,7 +301,7 @@ def get_or_create_excel(empresa_id, empresa_nombre=""):
     ws = wb.active
     ws.title = "Repositorio Facturas"
 
-    ws.merge_cells('A1:U1')
+    ws.merge_cells('A1:Z1')
     title_cell = ws['A1']
     title_cell.value = f"REPOSITORIO DE FACTURAS — {empresa_nombre.upper()}" if empresa_nombre else "REPOSITORIO DE FACTURAS"
     title_cell.font = WHITE_BOLD_13
@@ -364,8 +366,12 @@ def get_or_create_excel(empresa_id, empresa_nombre=""):
     ws3['B2'].fill = MED_BLUE
     ws3['A3'].value = "Cantidad de Facturas"
     ws3['B3'] = "=COUNTA('Repositorio Facturas'!C5:C9999)"
-    ws3['A4'].value = "Importe total facturado ($)"
+    ws3['A4'].value = "Importe total facturado (ARS)"
     ws3['B4'] = "=SUM('Repositorio Facturas'!R5:R9999)"
+    ws3['A5'].value = "Importe total facturado (USD)"
+    ws3['B5'] = "=SUM('Repositorio Facturas'!W5:W9999)"
+    ws3['A6'].value = "Facturas con alertas"
+    ws3['B6'] = "=COUNTIF('Repositorio Facturas'!Y5:Y9999,\"<>OK\")"
     ws3.column_dimensions['A'].width = 30
     ws3.column_dimensions['B'].width = 24
 
@@ -414,6 +420,215 @@ def clean_field(value, stop_words=None):
                 value = value[:idx]
     return value.strip()
 
+
+# ═══════════════════════════════════════════════
+# DETECCIÓN DE ANOMALÍAS (AUDITOR AUTOMÁTICO)
+# ═══════════════════════════════════════════════
+
+def validar_cuit(cuit_str):
+    """Valida dígito verificador de CUIT argentino."""
+    digits = cuit_str.replace('-', '')
+    if len(digits) != 11 or not digits.isdigit():
+        return False
+    mult = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2]
+    total = sum(int(d) * m for d, m in zip(digits[:10], mult))
+    check = 11 - (total % 11)
+    if check == 11:
+        check = 0
+    elif check == 10:
+        check = 9
+    return check == int(digits[10])
+
+
+def detectar_anomalias(data):
+    """Analiza una factura y devuelve lista de alertas."""
+    alertas = []
+
+    # 1. CUIT inválido
+    cuit_e = data.get('cuit_emisor', '')
+    if cuit_e and not validar_cuit(cuit_e):
+        alertas.append("CUIT Emisor inválido")
+    cuit_c = data.get('cuit_cliente', '')
+    if cuit_c and not validar_cuit(cuit_c):
+        alertas.append("CUIT Cliente inválido")
+
+    # 2. CUIT emisor = CUIT cliente (auto-factura)
+    if cuit_e and cuit_c and cuit_e.replace('-', '') == cuit_c.replace('-', ''):
+        alertas.append("CUIT Emisor = Cliente (auto-factura)")
+
+    # 3. Importe cero o negativo
+    importe = data.get('importe', 0)
+    if not importe or importe <= 0:
+        alertas.append("Importe $0 o negativo")
+
+    # 4. Importe muy alto (> $50M ARS)
+    if importe and importe > 50000000:
+        alertas.append(f"Importe inusual: ${importe:,.0f}")
+
+    # 5. CAE vencido
+    vto_cae = data.get('vto_cae', '')
+    if vto_cae:
+        try:
+            for fmt in ('%d/%m/%Y', '%d-%m-%Y'):
+                try:
+                    vto_date = datetime.strptime(vto_cae, fmt)
+                    if vto_date < datetime.now():
+                        alertas.append("CAE vencido")
+                    break
+                except ValueError:
+                    continue
+        except Exception:
+            pass
+
+    # 6. Fecha futura
+    fecha = data.get('fecha', '')
+    if fecha:
+        try:
+            for fmt in ('%d/%m/%Y', '%d-%m-%Y'):
+                try:
+                    f_date = datetime.strptime(fecha, fmt)
+                    if f_date > datetime.now() + timedelta(days=1):
+                        alertas.append("Fecha de emisión futura")
+                    break
+                except ValueError:
+                    continue
+        except Exception:
+            pass
+
+    # 7. Campos críticos faltantes
+    if not data.get('cae'):
+        alertas.append("Sin CAE")
+    if not data.get('cuit_emisor'):
+        alertas.append("Sin CUIT Emisor")
+    if not data.get('razon_social_emisor'):
+        alertas.append("Sin Razón Social Emisor")
+
+    # 8. Condición IVA inconsistente
+    tipo = data.get('tipo', '').lower()
+    cond_cliente = data.get('cond_iva_cliente', '').lower()
+    if 'factura a' in tipo and 'monotributo' in cond_cliente:
+        alertas.append("Factura A a Monotributista (revisar)")
+
+    return alertas
+
+
+# ═══════════════════════════════════════════════
+# CATEGORIZACIÓN INTELIGENTE
+# ═══════════════════════════════════════════════
+
+CATEGORIAS_REGLAS = [
+    # (palabras clave en producto/razón social, categoría, centro de costo)
+    (['honorarios', 'servicio profesional', 'consultor', 'asesor'], 'Servicio Profesional', 'Servicios'),
+    (['hosting', 'dominio', 'cloud', 'software', 'licencia', 'saas', 'aws', 'google cloud'], 'Tecnología', 'IT'),
+    (['alquiler', 'expensas', 'inmobiliario'], 'Alquiler / Inmueble', 'Inmueble'),
+    (['seguro', 'póliza', 'cobertura'], 'Seguros', 'Seguros'),
+    (['electricidad', 'gas', 'agua', 'internet', 'teléfono', 'celular', 'edenor', 'edesur', 'metrogas', 'telecom', 'movistar', 'claro', 'personal'], 'Servicios Públicos', 'Servicios'),
+    (['combustible', 'nafta', 'gasoil', 'ypf', 'shell', 'axion'], 'Combustible', 'Transporte'),
+    (['supermercado', 'alimento', 'comida', 'catering', 'restaurant'], 'Alimentación', 'Gastos Generales'),
+    (['publicidad', 'marketing', 'google ads', 'facebook', 'meta', 'campaña'], 'Marketing / Publicidad', 'Marketing'),
+    (['impuesto', 'iibb', 'ingresos brutos', 'afip', 'arba', 'agip', 'tasa', 'contribución'], 'Impuestos / Tasas', 'Impuestos'),
+    (['contable', 'contador', 'auditor', 'estudio'], 'Honorarios Contables', 'Servicios'),
+    (['transporte', 'flete', 'envío', 'logística', 'correo', 'oca', 'andreani'], 'Transporte / Logística', 'Logística'),
+    (['mueble', 'equipo', 'computadora', 'notebook', 'monitor', 'impresora'], 'Equipamiento', 'Activos Fijos'),
+    (['papelería', 'librería', 'insumo', 'oficina', 'toner', 'resma'], 'Insumos Oficina', 'Gastos Generales'),
+]
+
+
+def categorizar_factura(data):
+    """Asigna categoría y centro de costo basado en reglas."""
+    tipo = data.get('tipo', '').lower()
+
+    # Primero determinar si es Venta o Gasto por el tipo de comprobante
+    es_nota_credito = 'nota de cr' in tipo
+    es_nota_debito = 'nota de d' in tipo
+
+    # Buscar match por producto + razón social
+    texto_busqueda = (
+        (data.get('producto', '') + ' ' +
+         data.get('razon_social_emisor', '') + ' ' +
+         data.get('razon_social_cliente', '')).lower()
+    )
+
+    for keywords, categoria, centro in CATEGORIAS_REGLAS:
+        for kw in keywords:
+            if kw in texto_busqueda:
+                if es_nota_credito:
+                    return f"NC - {categoria}", centro
+                elif es_nota_debito:
+                    return f"ND - {categoria}", centro
+                return categoria, centro
+
+    # Default
+    if 'factura' in tipo:
+        return 'Gasto General', 'Sin Clasificar'
+    elif es_nota_credito:
+        return 'Nota de Crédito', 'Sin Clasificar'
+    elif es_nota_debito:
+        return 'Nota de Débito', 'Sin Clasificar'
+    elif 'recibo' in tipo:
+        return 'Recibo', 'Sin Clasificar'
+
+    return 'Sin Categoría', 'Sin Clasificar'
+
+
+# ═══════════════════════════════════════════════
+# SOPORTE MULTIMONEDA (ARS + USD)
+# ═══════════════════════════════════════════════
+
+_cached_usd_rate = {"rate": None, "date": None}
+
+
+def get_usd_rate():
+    """Obtiene tipo de cambio oficial USD/ARS del día. Cache por fecha."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    if _cached_usd_rate["date"] == today and _cached_usd_rate["rate"]:
+        return _cached_usd_rate["rate"]
+    try:
+        import urllib.request
+        import json as _json
+        # Bluelytics API — tipo de cambio oficial + blue Argentina
+        req = urllib.request.Request("https://api.bluelytics.com.ar/v2/latest",
+                                     headers={"User-Agent": "AutoData/3.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = _json.loads(resp.read())
+            # Usar cotización oficial venta
+            rate = data.get("oficial", {}).get("value_sell", 0)
+            if rate and rate > 0:
+                _cached_usd_rate["rate"] = round(rate, 2)
+                _cached_usd_rate["date"] = today
+                return _cached_usd_rate["rate"]
+    except Exception:
+        pass
+    try:
+        import urllib.request
+        import json as _json
+        req = urllib.request.Request("https://dolarapi.com/v1/dolares/oficial",
+                                     headers={"User-Agent": "AutoData/3.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = _json.loads(resp.read())
+            rate = data.get("venta", 0)
+            if rate and rate > 0:
+                _cached_usd_rate["rate"] = round(rate, 2)
+                _cached_usd_rate["date"] = today
+                return _cached_usd_rate["rate"]
+    except Exception:
+        pass
+    # Fallback
+    return _cached_usd_rate.get("rate") or 0
+
+
+def convertir_a_usd(importe_ars, tc=None):
+    """Convierte ARS a USD usando tipo de cambio del día."""
+    if not tc:
+        tc = get_usd_rate()
+    if tc and tc > 0 and importe_ars:
+        return round(importe_ars / tc, 2)
+    return 0
+
+
+# ═══════════════════════════════════════════════
+# PDF EXTRACTION
+# ═══════════════════════════════════════════════
 
 def extract_invoice_data(pdf_path):
     if not PDF_SUPPORT:
@@ -521,7 +736,12 @@ def extract_invoice_data(pdf_path):
         return None
 
 
+ORANGE_FILL = PatternFill(start_color="FFA500", end_color="FFA500", fill_type="solid") if EXCEL_SUPPORT else None
+RED_FONT = Font(name="Arial", size=9, color="CC0000") if EXCEL_SUPPORT else None
+
+
 def add_invoice_row(ws, row_num, data, filename):
+    # Campos base (cols 1-20)
     fields = [
         ('tipo', 1), ('punto_vta', 2), ('nro_comp', 3), ('fecha', 4),
         ('cuit_emisor', 5), ('razon_social_emisor', 6), ('domicilio_emisor', 7),
@@ -540,10 +760,50 @@ def add_invoice_row(ws, row_num, data, filename):
         if not val and val != 0:
             cell.fill = YELLOW_FILL
             missing.append(EXCEL_HEADERS[col - 1])
-    cell_u = ws.cell(row=row_num, column=21)
+
+    # Categorización Inteligente (cols 21-22)
+    categoria, centro = categorizar_factura(data)
+    ws.cell(row=row_num, column=21).value = categoria
+    ws.cell(row=row_num, column=21).font = DATA_FONT
+    ws.cell(row=row_num, column=21).alignment = LEFT
+    ws.cell(row=row_num, column=22).value = centro
+    ws.cell(row=row_num, column=22).font = DATA_FONT
+    ws.cell(row=row_num, column=22).alignment = LEFT
+
+    # Multimoneda (cols 23-24)
+    importe_ars = data.get('importe', 0) or 0
+    tc = get_usd_rate()
+    importe_usd = convertir_a_usd(importe_ars, tc)
+    ws.cell(row=row_num, column=23).value = importe_usd
+    ws.cell(row=row_num, column=23).font = DATA_FONT
+    ws.cell(row=row_num, column=23).alignment = LEFT
+    ws.cell(row=row_num, column=24).value = tc if tc else "N/D"
+    ws.cell(row=row_num, column=24).font = DATA_FONT
+    ws.cell(row=row_num, column=24).alignment = CENTER
+
+    # Detección de Anomalías (col 25)
+    alertas = detectar_anomalias(data)
+    alertas_str = " | ".join(alertas) if alertas else "OK"
+    cell_alertas = ws.cell(row=row_num, column=25)
+    cell_alertas.value = alertas_str
+    cell_alertas.font = RED_FONT if alertas else DATA_FONT
+    cell_alertas.alignment = LEFT
+    if alertas:
+        cell_alertas.fill = ORANGE_FILL
+
+    # Archivo PDF (col 26)
+    cell_u = ws.cell(row=row_num, column=26)
     cell_u.value = filename
     cell_u.font = DATA_FONT
     cell_u.alignment = LEFT
+
+    # Guardar datos extra en data dict para el response
+    data['_categoria'] = categoria
+    data['_centro'] = centro
+    data['_usd'] = importe_usd
+    data['_tc'] = tc
+    data['_alertas'] = alertas
+
     return missing
 
 
@@ -618,9 +878,17 @@ def upload_and_process():
                         existing.add(nro)
                         new_count += 1
                         detail = f"Comp. {nro} — ${invoice_data.get('importe', 0):,.2f}"
+                        if invoice_data.get('_usd'):
+                            detail += f" (USD {invoice_data['_usd']:,.2f})"
                         if missing:
-                            detail += f" (faltantes: {', '.join(missing[:3])})"
-                        documents.append({"nombre": filename, "estado": "procesado", "detalle": detail})
+                            detail += f" | Faltantes: {', '.join(missing[:3])}"
+                        doc_entry = {
+                            "nombre": filename, "estado": "procesado", "detalle": detail,
+                            "categoria": invoice_data.get('_categoria', ''),
+                            "centro": invoice_data.get('_centro', ''),
+                            "alertas": invoice_data.get('_alertas', [])
+                        }
+                        documents.append(doc_entry)
                 else:
                     add_otros_doc(wb, filename, "No es comprobante AFIP. Sin CAE ni CUIT válidos.")
                     documents.append({"nombre": filename, "estado": "no_factura", "detalle": "Sin CAE/CUIT — no es factura AFIP"})
@@ -705,18 +973,23 @@ def invoice_preview():
         ws = wb.active
         rows = []
         for row in ws.iter_rows(min_row=5, values_only=True):
-            if row and row[2]:
+            if row and len(row) > 2 and row[2]:
                 rows.append({
                     "tipo": row[0] or "",
                     "punto_vta": row[1] or "",
                     "nro_comp": row[2] or "",
                     "fecha": row[3] or "",
-                    "emisor": row[5] or "",
-                    "cliente": row[9] or "",
-                    "producto": row[16] or "",
-                    "importe": row[17] or 0,
-                    "cae": row[18] or "",
-                    "archivo": row[20] or ""
+                    "emisor": row[5] or "" if len(row) > 5 else "",
+                    "cliente": row[9] or "" if len(row) > 9 else "",
+                    "producto": row[16] or "" if len(row) > 16 else "",
+                    "importe": row[17] or 0 if len(row) > 17 else 0,
+                    "cae": row[18] or "" if len(row) > 18 else "",
+                    "categoria": row[20] or "" if len(row) > 20 else "",
+                    "centro": row[21] or "" if len(row) > 21 else "",
+                    "usd": row[22] or 0 if len(row) > 22 else 0,
+                    "tc": row[23] or "" if len(row) > 23 else "",
+                    "alertas": row[24] or "OK" if len(row) > 24 else "OK",
+                    "archivo": row[25] or "" if len(row) > 25 else (row[20] or "" if len(row) > 20 else "")
                 })
         wb.close()
         return jsonify({"rows": rows, "total": len(rows)})
