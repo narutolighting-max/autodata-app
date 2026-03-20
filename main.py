@@ -31,13 +31,23 @@ except ImportError:
 # ═══════════════════════════════════════════════
 # CONFIGURACIÓN
 # ═══════════════════════════════════════════════
-VERSION = "3.0.0"
+VERSION = "3.1.0"
 SECRET_KEY = os.environ.get("AUTODATA_SECRET", secrets.token_hex(32))
-DB_PATH = os.environ.get("DATABASE_URL", "autodata.db")
 PORT = int(os.environ.get("PORT", 5000))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+
+# Railway Volume: si RAILWAY_VOLUME_MOUNT_PATH está definido, usar ese directorio
+# para DB, data y uploads (persiste entre deploys)
+PERSIST_DIR = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH", "")
+if PERSIST_DIR:
+    DB_PATH = os.path.join(PERSIST_DIR, "autodata.db")
+    DATA_DIR = os.path.join(PERSIST_DIR, "data")
+    UPLOAD_DIR = os.path.join(PERSIST_DIR, "uploads")
+else:
+    DB_PATH = os.environ.get("DATABASE_URL", "autodata.db")
+    DATA_DIR = os.path.join(BASE_DIR, "data")
+    UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -239,6 +249,37 @@ def logout():
     conn.commit()
     conn.close()
     return jsonify({"mensaje": "Sesión cerrada."})
+
+
+@app.route("/ad-api/auth/change-password", methods=["POST"])
+@requiere_auth
+def change_password():
+    data = request.get_json() or {}
+    current_pw = data.get("current_password", "").strip()
+    new_pw = data.get("new_password", "").strip()
+
+    if not current_pw or not new_pw:
+        return jsonify({"error": "Se requiere la contraseña actual y la nueva."}), 400
+    if len(new_pw) < 8:
+        return jsonify({"error": "La nueva contraseña debe tener al menos 8 caracteres."}), 400
+
+    conn = get_db()
+    user = conn.execute("SELECT id, password_hash FROM usuarios WHERE id=?",
+                        (request.user["id"],)).fetchone()
+
+    if not user or user["password_hash"] != _hash_password(current_pw):
+        conn.close()
+        return jsonify({"error": "La contraseña actual es incorrecta."}), 403
+
+    conn.execute("UPDATE usuarios SET password_hash=? WHERE id=?",
+                 (_hash_password(new_pw), request.user["id"]))
+    # Invalidar todas las sesiones excepto la actual
+    token = request.headers.get("X-AutoData-Token")
+    conn.execute("UPDATE sesiones SET activa=0 WHERE usuario_id=? AND token!=?",
+                 (request.user["id"], token))
+    conn.commit()
+    conn.close()
+    return jsonify({"mensaje": "Contraseña actualizada correctamente."})
 
 
 # ═══════════════════════════════════════════════
