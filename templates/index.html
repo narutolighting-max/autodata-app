@@ -903,7 +903,10 @@ function showResults(data) {
     dl.innerHTML = (data.documents || []).map(function(d) {
         var cls = d.estado === 'procesado' ? 'badge-ok' : d.estado === 'duplicado' ? 'badge-skip' : 'badge-err';
         var label = d.estado === 'procesado' ? 'NUEVA' : d.estado === 'duplicado' ? 'DUPLICADA' : 'OTRO';
-        return '<li class="doc-item"><span class="badge ' + cls + '">' + label + '</span><strong>' + esc(d.nombre) + '</strong><span style="color:var(--gray-500)">' + esc(d.detalle) + '</span></li>';
+        var extra = '';
+        if (d.categoria) extra += '<span class="badge" style="background:var(--primary-light);color:var(--primary)">' + esc(d.categoria) + '</span>';
+        if (d.alertas && d.alertas.length > 0) extra += '<span class="badge badge-err">' + d.alertas.length + ' alerta(s)</span>';
+        return '<li class="doc-item"><span class="badge ' + cls + '">' + label + '</span><strong>' + esc(d.nombre) + '</strong>' + extra + '<span style="color:var(--gray-500);font-size:.8rem">' + esc(d.detalle) + '</span></li>';
     }).join('');
 
     // Post actions
@@ -947,11 +950,13 @@ async function loadPreview() {
         }
         var html = '<p style="margin-bottom:12px;font-size:.85rem;color:var(--gray-500)">' + data.total + ' factura(s) en el repositorio</p>';
         html += '<div class="table-wrap"><table><thead><tr>';
-        html += '<th>Tipo</th><th>Pto. Vta.</th><th>Nro. Comp.</th><th>Fecha</th><th>Emisor</th><th>Cliente</th><th>Producto</th><th>Importe</th><th>CAE</th><th>Archivo</th>';
+        html += '<th>Tipo</th><th>Nro. Comp.</th><th>Fecha</th><th>Emisor</th><th>Importe ARS</th><th>USD</th><th>Categoria</th><th>Centro Costo</th><th>Alertas</th><th>Archivo</th>';
         html += '</tr></thead><tbody>';
         data.rows.forEach(function(r) {
             var imp = typeof r.importe === 'number' ? '$' + r.importe.toLocaleString('es-AR', {minimumFractionDigits: 2}) : r.importe;
-            html += '<tr><td>' + esc(r.tipo) + '</td><td>' + esc(r.punto_vta) + '</td><td>' + esc(r.nro_comp) + '</td><td>' + esc(r.fecha) + '</td><td>' + esc(r.emisor) + '</td><td>' + esc(r.cliente) + '</td><td>' + esc(r.producto) + '</td><td>' + imp + '</td><td style="font-size:.7rem">' + esc(r.cae) + '</td><td style="font-size:.7rem">' + esc(r.archivo) + '</td></tr>';
+            var usd = typeof r.usd === 'number' && r.usd > 0 ? 'U$D ' + r.usd.toLocaleString('es-AR', {minimumFractionDigits: 2}) : '—';
+            var alertStyle = r.alertas && r.alertas !== 'OK' ? 'color:var(--danger);font-weight:600' : 'color:var(--success)';
+            html += '<tr><td>' + esc(r.tipo) + '</td><td>' + esc(r.nro_comp) + '</td><td>' + esc(r.fecha) + '</td><td>' + esc(r.emisor) + '</td><td>' + imp + '</td><td>' + usd + '</td><td>' + esc(r.categoria) + '</td><td>' + esc(r.centro) + '</td><td style="' + alertStyle + ';font-size:.75rem">' + esc(r.alertas) + '</td><td style="font-size:.7rem">' + esc(r.archivo) + '</td></tr>';
         });
         html += '</tbody></table></div>';
         container.innerHTML = html;
