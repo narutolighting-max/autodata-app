@@ -594,6 +594,7 @@
             </div>
             <button type="submit" class="btn-login" id="btnLogin">Iniciar Sesion</button>
         </form>
+        <a href="#" onclick="openChangePw(); return false;" style="display:block; text-align:center; margin-top:12px; font-size:.85rem; color:#2563eb; text-decoration:none;">Cambiar Clave</a>
         <p class="login-footer">AutoData Technologies v3.1 — dataintelligence.com</p>
     </div>
 </div>
@@ -609,22 +610,36 @@
                 <div class="name" id="headerUserName">—</div>
                 <div class="empresa" id="headerEmpresa">—</div>
             </div>
-            <button class="btn-changepw" onclick="openChangePw()">Cambiar Clave</button>
             <button class="btn-logout" onclick="doLogout()">Cerrar Sesion</button>
         </div>
     </header>
 
-    <!-- Modal Cambiar Contraseña -->
+    <!-- Modal Cambiar Contraseña (2 pasos) -->
     <div class="modal-overlay" id="modalChangePw">
         <div class="modal-box">
             <h3>Cambiar Contraseña</h3>
-            <input type="password" id="pwCurrent" placeholder="Contraseña actual">
-            <input type="password" id="pwNew" placeholder="Nueva contraseña (mín. 8 caracteres)">
-            <input type="password" id="pwConfirm" placeholder="Confirmar nueva contraseña">
-            <div class="modal-msg" id="pwMsg"></div>
-            <div class="modal-actions">
-                <button class="btn-secondary" onclick="closeChangePw()">Cancelar</button>
-                <button class="btn-primary" onclick="submitChangePw()">Guardar</button>
+            <!-- Paso 1: Pedir email y enviar código -->
+            <div id="pwStep1">
+                <p style="font-size:.85rem;color:#666;margin:0 0 16px">Ingresá tu email y te enviaremos un código de verificación.</p>
+                <input type="email" id="pwEmail" placeholder="Tu email">
+                <div class="modal-msg" id="pwMsg1"></div>
+                <div class="modal-actions">
+                    <button class="btn-secondary" onclick="closeChangePw()">Cancelar</button>
+                    <button class="btn-primary" id="btnSendCode" onclick="sendVerificationCode()">Enviar Código</button>
+                </div>
+            </div>
+            <!-- Paso 2: Código + contraseñas -->
+            <div id="pwStep2" style="display:none">
+                <p style="font-size:.85rem;color:#666;margin:0 0 16px">Ingresá el código que recibiste en <strong id="pwEmailDisplay"></strong></p>
+                <input type="text" id="pwCode" placeholder="Código de 6 dígitos" maxlength="6" style="text-align:center;font-size:1.2rem;letter-spacing:6px;font-weight:700">
+                <input type="password" id="pwCurrent" placeholder="Contraseña actual">
+                <input type="password" id="pwNew" placeholder="Nueva contraseña (mín. 8 caracteres)">
+                <input type="password" id="pwConfirm" placeholder="Confirmar nueva contraseña">
+                <div class="modal-msg" id="pwMsg2"></div>
+                <div class="modal-actions">
+                    <button class="btn-secondary" onclick="backToStep1()">Volver</button>
+                    <button class="btn-primary" onclick="submitChangePw()">Cambiar Contraseña</button>
+                </div>
             </div>
         </div>
     </div>
@@ -659,10 +674,6 @@
                     <div class="trust-item">
                         <div class="trust-icon trust-icon-green">&#x2715;</div>
                         <div><strong>Zero-Data Policy</strong><br>Tus PDFs se eliminan automaticamente despues del procesamiento. No almacenamos documentos originales.</div>
-                    </div>
-                    <div class="trust-item">
-                        <div class="trust-icon trust-icon-blue">&#x1F512;</div>
-                        <div><strong>Datos Aislados</strong><br>Cada empresa tiene su repositorio separado. Ningun cliente accede a datos de otro.</div>
                     </div>
                     <div class="trust-item">
                         <div class="trust-icon trust-icon-green">&#x2714;</div>
@@ -843,36 +854,73 @@ function showApp() {
     }
 }
 
-// ── Cambiar Contraseña ──
+// ── Cambiar Contraseña (2 pasos con verificación por email) ──
+var _changePwEmail = '';
+
 function openChangePw() {
-    document.getElementById('pwCurrent').value = '';
-    document.getElementById('pwNew').value = '';
-    document.getElementById('pwConfirm').value = '';
-    const msg = document.getElementById('pwMsg');
-    msg.className = 'modal-msg'; msg.textContent = '';
+    document.getElementById('pwEmail').value = '';
+    document.getElementById('pwStep1').style.display = '';
+    document.getElementById('pwStep2').style.display = 'none';
+    var m1 = document.getElementById('pwMsg1'); m1.className = 'modal-msg'; m1.textContent = '';
     document.getElementById('modalChangePw').classList.add('active');
 }
 function closeChangePw() {
     document.getElementById('modalChangePw').classList.remove('active');
 }
-async function submitChangePw() {
-    const msg = document.getElementById('pwMsg');
-    const cur = document.getElementById('pwCurrent').value;
-    const nw = document.getElementById('pwNew').value;
-    const conf = document.getElementById('pwConfirm').value;
+function backToStep1() {
+    document.getElementById('pwStep1').style.display = '';
+    document.getElementById('pwStep2').style.display = 'none';
+}
+
+async function sendVerificationCode() {
+    var msg = document.getElementById('pwMsg1');
+    var email = document.getElementById('pwEmail').value.trim();
     msg.className = 'modal-msg'; msg.textContent = '';
-    if (!cur || !nw) { msg.className = 'modal-msg error'; msg.textContent = 'Completá todos los campos.'; return; }
+    if (!email) { msg.className = 'modal-msg error'; msg.textContent = 'Ingresá tu email.'; return; }
+    var btn = document.getElementById('btnSendCode');
+    btn.disabled = true; btn.textContent = 'Enviando...';
+    try {
+        var resp = await fetch('/ad-api/auth/request-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email })
+        });
+        var res = await resp.json();
+        if (res.error) { msg.className = 'modal-msg error'; msg.textContent = res.error; btn.disabled = false; btn.textContent = 'Enviar Código'; return; }
+        _changePwEmail = email;
+        document.getElementById('pwEmailDisplay').textContent = email;
+        document.getElementById('pwCode').value = '';
+        document.getElementById('pwCurrent').value = '';
+        document.getElementById('pwNew').value = '';
+        document.getElementById('pwConfirm').value = '';
+        var m2 = document.getElementById('pwMsg2'); m2.className = 'modal-msg'; m2.textContent = '';
+        document.getElementById('pwStep1').style.display = 'none';
+        document.getElementById('pwStep2').style.display = '';
+    } catch (e) { msg.className = 'modal-msg error'; msg.textContent = 'Error de conexión.'; }
+    btn.disabled = false; btn.textContent = 'Enviar Código';
+}
+
+async function submitChangePw() {
+    var msg = document.getElementById('pwMsg2');
+    var code = document.getElementById('pwCode').value.trim();
+    var cur = document.getElementById('pwCurrent').value;
+    var nw = document.getElementById('pwNew').value;
+    var conf = document.getElementById('pwConfirm').value;
+    msg.className = 'modal-msg'; msg.textContent = '';
+    if (!code || !cur || !nw) { msg.className = 'modal-msg error'; msg.textContent = 'Completá todos los campos.'; return; }
+    if (code.length !== 6) { msg.className = 'modal-msg error'; msg.textContent = 'El código debe ser de 6 dígitos.'; return; }
     if (nw.length < 8) { msg.className = 'modal-msg error'; msg.textContent = 'La nueva contraseña debe tener al menos 8 caracteres.'; return; }
     if (nw !== conf) { msg.className = 'modal-msg error'; msg.textContent = 'Las contraseñas no coinciden.'; return; }
     try {
-        const res = await apiFetch('/ad-api/auth/change-password', {
+        var resp = await fetch('/ad-api/auth/change-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ current_password: cur, new_password: nw })
+            body: JSON.stringify({ email: _changePwEmail, code: code, current_password: cur, new_password: nw })
         });
+        var res = await resp.json();
         if (res.error) { msg.className = 'modal-msg error'; msg.textContent = res.error; return; }
-        msg.className = 'modal-msg success'; msg.textContent = 'Contraseña actualizada correctamente.';
-        setTimeout(closeChangePw, 1500);
+        msg.className = 'modal-msg success'; msg.textContent = res.mensaje;
+        setTimeout(closeChangePw, 2500);
     } catch (e) { msg.className = 'modal-msg error'; msg.textContent = 'Error al cambiar contraseña.'; }
 }
 
