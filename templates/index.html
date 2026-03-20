@@ -69,6 +69,45 @@
             transition: background .2s;
         }
         .btn-logout:hover { background: rgba(255,255,255,.25); }
+        .btn-changepw {
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,255,255,.2);
+            color: rgba(255,255,255,.85);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: .75rem;
+            transition: background .2s;
+        }
+        .btn-changepw:hover { background: rgba(255,255,255,.2); }
+
+        /* ─── MODAL ─── */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,.5); z-index: 1000; align-items: center; justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-box {
+            background: white; border-radius: 12px; padding: 32px; width: 90%; max-width: 400px;
+            box-shadow: 0 20px 60px rgba(0,0,0,.3);
+        }
+        .modal-box h3 { margin: 0 0 20px; color: #1a2233; font-size: 1.1rem; }
+        .modal-box input {
+            width: 100%; padding: 10px 12px; margin-bottom: 12px; border: 1px solid #ddd;
+            border-radius: 8px; font-size: .9rem; box-sizing: border-box;
+        }
+        .modal-box input:focus { border-color: #2563eb; outline: none; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+        .modal-actions { display: flex; gap: 10px; margin-top: 8px; }
+        .modal-actions button {
+            flex: 1; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-size: .9rem; font-weight: 600;
+        }
+        .modal-actions .btn-primary { background: #2563eb; color: white; }
+        .modal-actions .btn-primary:hover { background: #1d4ed8; }
+        .modal-actions .btn-secondary { background: #f1f5f9; color: #475569; }
+        .modal-actions .btn-secondary:hover { background: #e2e8f0; }
+        .modal-msg { font-size: .85rem; margin-top: 10px; padding: 8px 12px; border-radius: 6px; display: none; }
+        .modal-msg.error { display: block; background: #fef2f2; color: #dc2626; }
+        .modal-msg.success { display: block; background: #f0fdf4; color: #16a34a; }
 
         /* ─── TABS ─── */
         .tabs {
@@ -555,7 +594,7 @@
             </div>
             <button type="submit" class="btn-login" id="btnLogin">Iniciar Sesion</button>
         </form>
-        <p class="login-footer">AutoData Technologies v3.0 — dataintelligence.com</p>
+        <p class="login-footer">AutoData Technologies v3.1 — dataintelligence.com</p>
     </div>
 </div>
 
@@ -563,16 +602,32 @@
 <div id="appContainer" class="hidden">
     <header class="header">
         <div class="header-left">
-            <h1 style="letter-spacing:-0.5px"><span style="color:white">Auto</span><span style="color:#3bb2ff">Data</span></h1><span class="version">v3.0</span>
+            <h1 style="letter-spacing:-0.5px"><span style="color:white">Auto</span><span style="color:#3bb2ff">Data</span></h1><span class="version">v3.1</span>
         </div>
         <div class="header-right">
             <div class="user-info">
                 <div class="name" id="headerUserName">—</div>
                 <div class="empresa" id="headerEmpresa">—</div>
             </div>
+            <button class="btn-changepw" onclick="openChangePw()">Cambiar Clave</button>
             <button class="btn-logout" onclick="doLogout()">Cerrar Sesion</button>
         </div>
     </header>
+
+    <!-- Modal Cambiar Contraseña -->
+    <div class="modal-overlay" id="modalChangePw">
+        <div class="modal-box">
+            <h3>Cambiar Contraseña</h3>
+            <input type="password" id="pwCurrent" placeholder="Contraseña actual">
+            <input type="password" id="pwNew" placeholder="Nueva contraseña (mín. 8 caracteres)">
+            <input type="password" id="pwConfirm" placeholder="Confirmar nueva contraseña">
+            <div class="modal-msg" id="pwMsg"></div>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="closeChangePw()">Cancelar</button>
+                <button class="btn-primary" onclick="submitChangePw()">Guardar</button>
+            </div>
+        </div>
+    </div>
 
     <nav class="tabs">
         <div class="tab active" data-tab="upload" onclick="switchTab('upload')">Cargar Facturas</div>
@@ -726,7 +781,7 @@
 
 <script>
 /* ═══════════════════════════════════════════════
-   AutoData Frontend v3.0
+   AutoData Frontend v3.1
    ═══════════════════════════════════════════════ */
 
 const API = '';
@@ -786,6 +841,39 @@ function showApp() {
     } else {
         adminTab.classList.add('hidden');
     }
+}
+
+// ── Cambiar Contraseña ──
+function openChangePw() {
+    document.getElementById('pwCurrent').value = '';
+    document.getElementById('pwNew').value = '';
+    document.getElementById('pwConfirm').value = '';
+    const msg = document.getElementById('pwMsg');
+    msg.className = 'modal-msg'; msg.textContent = '';
+    document.getElementById('modalChangePw').classList.add('active');
+}
+function closeChangePw() {
+    document.getElementById('modalChangePw').classList.remove('active');
+}
+async function submitChangePw() {
+    const msg = document.getElementById('pwMsg');
+    const cur = document.getElementById('pwCurrent').value;
+    const nw = document.getElementById('pwNew').value;
+    const conf = document.getElementById('pwConfirm').value;
+    msg.className = 'modal-msg'; msg.textContent = '';
+    if (!cur || !nw) { msg.className = 'modal-msg error'; msg.textContent = 'Completá todos los campos.'; return; }
+    if (nw.length < 8) { msg.className = 'modal-msg error'; msg.textContent = 'La nueva contraseña debe tener al menos 8 caracteres.'; return; }
+    if (nw !== conf) { msg.className = 'modal-msg error'; msg.textContent = 'Las contraseñas no coinciden.'; return; }
+    try {
+        const res = await apiFetch('/ad-api/auth/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ current_password: cur, new_password: nw })
+        });
+        if (res.error) { msg.className = 'modal-msg error'; msg.textContent = res.error; return; }
+        msg.className = 'modal-msg success'; msg.textContent = 'Contraseña actualizada correctamente.';
+        setTimeout(closeChangePw, 1500);
+    } catch (e) { msg.className = 'modal-msg error'; msg.textContent = 'Error al cambiar contraseña.'; }
 }
 
 async function doLogout() {
