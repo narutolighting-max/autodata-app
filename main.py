@@ -5,11 +5,15 @@ Backend Flask con API REST + Frontend integrado
 """
 
 import os
+import json
 import sqlite3
 import hashlib
 import secrets
 import re
 import time
+import random
+import urllib.request
+import urllib.error
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import Flask, jsonify, request, send_from_directory
@@ -50,6 +54,13 @@ else:
 
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# SendGrid para verificación por email
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
+SENDGRID_FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@dataintelligence.com")
+
+# Caché de códigos de verificación: {email: {"code": "123456", "expira": datetime}}
+_verification_codes = {}
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["SECRET_KEY"] = SECRET_KEY
@@ -251,35 +262,147 @@ def logout():
     return jsonify({"mensaje": "Sesión cerrada."})
 
 
+def _send_email_sendgrid(to_email, subject, html_content):
+    """Enviar email usando SendGrid Web API v3 (sin dependencias externas)."""
+    if not SENDGRID_API_KEY:
+        return False, "SendGrid no configurado."
+    payload = json.dumps({
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": SENDGRID_FROM_EMAIL, "name": "AutoData Technologies"},
+        "subject": subject,
+        "content": [{"type": "text/html", "value": html_content}]
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.sendgrid.com/v3/mail/send",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {SENDGRID_API_KEY}",
+            "Content-Type": "application/json"
+        },
+        method="POST"
+    )
+    try:
+        resp = urllib.request.urlopen(req, timeout=10)
+        return True, "OK"
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        return False, f"SendGrid HTTP {e.code}: {body}"
+    except Exception as e:
+        return False, str(e)
+
+
+def _limpiar_codigos_expirados():
+    """Eliminar códigos vencidos del caché."""
+    ahora = datetime.utcnow()
+    expirados = [k for k, v in _verification_codes.items() if v["expira"] < ahora]
+    for k in expirados:
+        del _verification_codes[k]
+
+
+@app.route("/ad-api/auth/request-code", methods=["POST"])
+def request_verification_code():
+    """Envía un código de 6 dígitos al email del usuario para cambio de contraseña."""
+    data = request.get_json() or {}
+    email = data.get("email", "").strip().lower()
+
+    if not email:
+        return jsonify({"error": "Se requiere el email."}), 400
+
+    # Verificar que el email existe
+    conn = get_db()
+    user = conn.execute("SELECT id, nombre FROM usuarios WHERE email=? AND activo=1",
+                        (email,)).fetchone()
+    conn.close()
+
+    if not user:
+        return jsonify({"error": "No se encontró una cuenta con ese email."}), 404
+
+    # Rate limiting: no enviar si ya hay un código vigente hace menos de 60 seg
+    _limpiar_codigos_expirados()
+    if email in _verification_codes:
+        creado = _verification_codes[email].get("creado")
+        if creado and (datetime.utcnow() - creado).total_seconds() < 60:
+            return jsonify({"error": "Ya se envió un código. Esperá 60 segundos."}), 429
+
+    # Generar código de 6 dígitos
+    code = str(random.randint(100000, 999999))
+    _verification_codes[email] = {
+        "code": code,
+        "expira": datetime.utcnow() + timedelta(minutes=10),
+        "creado": datetime.utcnow(),
+        "intentos": 0
+    }
+
+    # Enviar email
+    nombre = user["nombre"] or email
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:20px">
+        <h2 style="color:#1a2233">AutoData Technologies</h2>
+        <p>Hola <strong>{nombre}</strong>,</p>
+        <p>Tu código de verificación para cambiar la contraseña es:</p>
+        <div style="background:#f0f4ff;border-radius:12px;padding:20px;text-align:center;margin:20px 0">
+            <span style="font-size:32px;font-weight:700;letter-spacing:8px;color:#2563eb">{code}</span>
+        </div>
+        <p style="color:#666;font-size:14px">Este código expira en <strong>10 minutos</strong>.</p>
+        <p style="color:#666;font-size:14px">Si no solicitaste este cambio, ignorá este email.</p>
+        <hr style="border:none;border-top:1px solid #eee;margin:20px 0">
+        <p style="color:#999;font-size:12px">AutoData Technologies — dataintelligence.com</p>
+    </div>
+    """
+    ok, msg = _send_email_sendgrid(email, "Tu código de verificación — AutoData", html)
+
+    if not ok:
+        del _verification_codes[email]
+        return jsonify({"error": f"No se pudo enviar el email. {msg}"}), 500
+
+    return jsonify({"mensaje": "Código enviado a tu email.", "email_enviado": True})
+
+
 @app.route("/ad-api/auth/change-password", methods=["POST"])
-@requiere_auth
 def change_password():
     data = request.get_json() or {}
+    email = data.get("email", "").strip().lower()
+    code = data.get("code", "").strip()
     current_pw = data.get("current_password", "").strip()
     new_pw = data.get("new_password", "").strip()
 
-    if not current_pw or not new_pw:
-        return jsonify({"error": "Se requiere la contraseña actual y la nueva."}), 400
+    if not email or not code or not current_pw or not new_pw:
+        return jsonify({"error": "Completá todos los campos."}), 400
     if len(new_pw) < 8:
         return jsonify({"error": "La nueva contraseña debe tener al menos 8 caracteres."}), 400
 
+    # Verificar código
+    _limpiar_codigos_expirados()
+    stored = _verification_codes.get(email)
+    if not stored:
+        return jsonify({"error": "No hay un código vigente. Solicitá uno nuevo."}), 400
+
+    stored["intentos"] = stored.get("intentos", 0) + 1
+    if stored["intentos"] > 5:
+        del _verification_codes[email]
+        return jsonify({"error": "Demasiados intentos. Solicitá un nuevo código."}), 429
+
+    if stored["code"] != code:
+        return jsonify({"error": f"Código incorrecto. Te quedan {5 - stored['intentos']} intentos."}), 403
+
+    # Código correcto — verificar contraseña actual
     conn = get_db()
-    user = conn.execute("SELECT id, password_hash FROM usuarios WHERE id=?",
-                        (request.user["id"],)).fetchone()
+    user = conn.execute("SELECT id, password_hash FROM usuarios WHERE email=?",
+                        (email,)).fetchone()
 
     if not user or user["password_hash"] != _hash_password(current_pw):
         conn.close()
-        return jsonify({"error": "La contraseña actual es incorrecta."}), 403
+        return jsonify({"error": "Contraseña actual incorrecta."}), 403
 
     conn.execute("UPDATE usuarios SET password_hash=? WHERE id=?",
-                 (_hash_password(new_pw), request.user["id"]))
-    # Invalidar todas las sesiones excepto la actual
-    token = request.headers.get("X-AutoData-Token")
-    conn.execute("UPDATE sesiones SET activa=0 WHERE usuario_id=? AND token!=?",
-                 (request.user["id"], token))
+                 (_hash_password(new_pw), user["id"]))
+    conn.execute("UPDATE sesiones SET activa=0 WHERE usuario_id=?", (user["id"],))
     conn.commit()
     conn.close()
-    return jsonify({"mensaje": "Contraseña actualizada correctamente."})
+
+    # Limpiar código usado
+    del _verification_codes[email]
+    return jsonify({"mensaje": "Contraseña actualizada. Iniciá sesión con tu nueva clave."})
 
 
 # ═══════════════════════════════════════════════
