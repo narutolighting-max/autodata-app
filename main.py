@@ -8,6 +8,7 @@ import os
 import json
 import sqlite3
 import hashlib
+import bcrypt
 import secrets
 import re
 import time
@@ -117,24 +118,38 @@ def init_db():
 
     conn.commit()
 
-    # Crear usuarios iniciales si no existen
+    # Crear usuario admin inicial si no existen usuarios
     if c.execute("SELECT COUNT(*) FROM usuarios").fetchone()[0] == 0:
-        c.execute("""INSERT INTO usuarios (email, password_hash, nombre, rol, empresa, empresa_id)
-            VALUES (?, ?, ?, ?, ?, ?)""",
-            ('demo@dataintelligence.com', _hash_password('AutoData2025'),
-             'Guillermo', 'admin', 'Dataintelligence.com', 'dataintelligence'))
+        admin_email = os.environ.get("AUTODATA_ADMIN_EMAIL", "admin@autodata.local")
+        admin_password = os.environ.get("AUTODATA_ADMIN_PASSWORD")
+        admin_name = os.environ.get("AUTODATA_ADMIN_NAME", "Admin")
+        admin_empresa = os.environ.get("AUTODATA_EMPRESA", "Mi Empresa")
+        admin_empresa_id = os.environ.get("AUTODATA_EMPRESA_ID", "default")
+
+        if not admin_password:
+            admin_password = secrets.token_urlsafe(16)
+            print(f"[SETUP] Admin user created: {admin_email}")
+            print(f"[SETUP] Temporary password: {admin_password}")
+            print(f"[SETUP] Set AUTODATA_ADMIN_PASSWORD env var to change this.")
 
         c.execute("""INSERT INTO usuarios (email, password_hash, nombre, rol, empresa, empresa_id)
             VALUES (?, ?, ?, ?, ?, ?)""",
-            ('operadora@dataintelligence.com', _hash_password('Operadora2025'),
-             'Operadora', 'operator', 'Dataintelligence.com', 'dataintelligence'))
+            (admin_email, _hash_password(admin_password),
+             admin_name, 'admin', admin_empresa, admin_empresa_id))
         conn.commit()
 
     conn.close()
 
 
 def _hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+
+def _verify_password(password, hashed):
+    """Verify password against bcrypt hash. Also supports legacy SHA-256 for migration."""
+    if hashed and hashed.startswith(r'$2b$'):
+        return bcrypt.checkpw(password.encode(), hashed.encode())
+    return hashlib.sha256(password.encode()).hexdigest() == hashed
 
 
 # ═══════════════════════════════════════════════
@@ -224,9 +239,18 @@ def login():
     usuario = conn.execute("SELECT * FROM usuarios WHERE email=? AND activo=1", (email,)).fetchone()
     conn.close()
 
-    if not usuario or usuario["password_hash"] != _hash_password(password):
+    if not usuario or not _verify_password(password, usuario["password_hash"]):
         time.sleep(0.5)
         return jsonify({"error": True, "mensaje": "Credenciales incorrectas."}), 401
+
+    # Migrate legacy SHA-256 hash to bcrypt on successful login
+    stored_hash = usuario["password_hash"]
+    if stored_hash and not stored_hash.startswith("$2b$"):
+        conn2 = get_db()
+        conn2.execute("UPDATE usuarios SET password_hash=? WHERE id=?",
+                      (_hash_password(password), usuario["id"]))
+        conn2.commit()
+        conn2.close()
 
     token, expira = generar_token(usuario["id"])
 
@@ -390,7 +414,7 @@ def change_password():
     user = conn.execute("SELECT id, password_hash FROM usuarios WHERE email=?",
                         (email,)).fetchone()
 
-    if not user or user["password_hash"] != _hash_password(current_pw):
+    if not user or not _verify_password(current_pw, user["password_hash"]):
         conn.close()
         return jsonify({"error": "Contraseña actual incorrecta."}), 403
 
@@ -1020,6 +1044,10 @@ def upload_and_process():
 
         for f in files:
             filename = f.filename or "sin_nombre.pdf"
+            # Sanitize filename to prevent path traversal
+            filename = os.path.basename(filename).replace("..", "").strip()
+            if not filename:
+                filename = f"upload_{secrets.token_hex(8)}.pdf"
             if not filename.lower().endswith('.pdf'):
                 add_otros_doc(wb, filename, "No es un archivo PDF")
                 documents.append({"nombre": filename, "estado": "no_pdf", "detalle": "No es PDF"})
